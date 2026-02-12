@@ -20,6 +20,26 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Chiefs FC",
   description: "Chiefs FC — Division 3 Football Club, Asheville NC",
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
+  openGraph: {
+    title: "Chiefs FC",
+    description: "Division 3 Football Club — Asheville, NC",
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: "Chiefs FC Logo" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Chiefs FC",
+    description: "Division 3 Football Club — Asheville, NC",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({
