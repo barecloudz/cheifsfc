@@ -58,11 +58,19 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { id, homeScore, awayScore } = body;
+  const { id, homeScore, awayScore, date, venue, homeTeamId, awayTeamId } = body;
+
+  const data: Record<string, unknown> = {};
+  if (homeScore !== undefined) data.homeScore = homeScore;
+  if (awayScore !== undefined) data.awayScore = awayScore;
+  if (date !== undefined) data.date = new Date(date);
+  if (venue !== undefined) data.venue = venue;
+  if (homeTeamId !== undefined) data.homeTeamId = homeTeamId;
+  if (awayTeamId !== undefined) data.awayTeamId = awayTeamId;
 
   const match = await prisma.match.update({
     where: { id },
-    data: { homeScore, awayScore },
+    data,
     include: { homeTeam: true, awayTeam: true },
   });
 

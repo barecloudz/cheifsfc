@@ -15,7 +15,8 @@ interface AdminMatchFormProps {
 export default function AdminMatchForm({ teams, onSuccess }: AdminMatchFormProps) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("19:00");
-  const [venue, setVenue] = useState("");
+  const [fieldName, setFieldName] = useState("");
+  const [address, setAddress] = useState("");
   const [homeTeamId, setHomeTeamId] = useState("");
   const [awayTeamId, setAwayTeamId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ export default function AdminMatchForm({ teams, onSuccess }: AdminMatchFormProps
     e.preventDefault();
     setLoading(true);
 
+    const venue = address ? `${fieldName}, ${address}` : fieldName;
     const dateTime = new Date(`${date}T${time}:00`);
     const res = await fetch("/api/matches", {
       method: "POST",
@@ -40,7 +42,8 @@ export default function AdminMatchForm({ teams, onSuccess }: AdminMatchFormProps
     if (res.ok) {
       setDate("");
       setTime("19:00");
-      setVenue("");
+      setFieldName("");
+      setAddress("");
       setHomeTeamId("");
       setAwayTeamId("");
       onSuccess();
@@ -65,8 +68,12 @@ export default function AdminMatchForm({ teams, onSuccess }: AdminMatchFormProps
         </div>
       </div>
       <div>
-        <label className={labelClass}>Venue</label>
-        <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} placeholder="e.g. JBL Field 3, 498 Azalea Rd E, Asheville, NC" required />
+        <label className={labelClass}>Field #</label>
+        <input type="text" value={fieldName} onChange={(e) => setFieldName(e.target.value)} className={inputClass} placeholder="e.g. JBL Field 3" required />
+      </div>
+      <div>
+        <label className={labelClass}>Address</label>
+        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} placeholder="e.g. 498 Azalea Rd E, Asheville, NC" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

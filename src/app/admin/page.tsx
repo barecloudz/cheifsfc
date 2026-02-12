@@ -14,10 +14,20 @@ interface MatchData {
   id: number;
   date: string;
   venue: string;
+  homeTeamId: number;
+  awayTeamId: number;
   homeTeam: { name: string };
   awayTeam: { name: string };
   homeScore: number | null;
   awayScore: number | null;
+}
+
+interface EditForm {
+  date: string;
+  time: string;
+  venue: string;
+  homeTeamId: string;
+  awayTeamId: string;
 }
 
 interface Standing {
@@ -45,6 +55,10 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("schedule");
   const [saving, setSaving] = useState<number | null>(null);
+
+  // Edit match state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>({ date: "", time: "", venue: "", homeTeamId: "", awayTeamId: "" });
 
   // Table management state
   const [newTeamName, setNewTeamName] = useState("");
@@ -96,6 +110,39 @@ export default function AdminDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: matchId }),
     });
+    loadData();
+  }
+
+  function startEdit(m: MatchData) {
+    const d = new Date(m.date);
+    const dateStr = d.toISOString().split("T")[0];
+    const timeStr = d.toTimeString().slice(0, 5);
+    setEditForm({
+      date: dateStr,
+      time: timeStr,
+      venue: m.venue,
+      homeTeamId: String(m.homeTeamId),
+      awayTeamId: String(m.awayTeamId),
+    });
+    setEditingId(m.id);
+  }
+
+  async function saveEdit(matchId: number) {
+    setSaving(matchId);
+    const dateTime = new Date(`${editForm.date}T${editForm.time}:00`);
+    await fetch("/api/matches", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: matchId,
+        date: dateTime.toISOString(),
+        venue: editForm.venue,
+        homeTeamId: parseInt(editForm.homeTeamId),
+        awayTeamId: parseInt(editForm.awayTeamId),
+      }),
+    });
+    setSaving(null);
+    setEditingId(null);
     loadData();
   }
 
@@ -468,73 +515,133 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   {upcoming.map((m) => (
                     <div key={m.id} className="card-premium p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-muted font-medium">
-                          {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                          {" \u00B7 "}
-                          {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                        </span>
-                        <span className="text-[10px] font-bold text-gold-dark bg-gold/15 px-2 py-0.5 rounded-full">UPCOMING</span>
-                      </div>
-
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-foreground">{m.homeTeam.name}</span>
-                        <span className="text-xs text-muted font-semibold">vs</span>
-                        <span className="text-sm font-bold text-foreground text-right">{m.awayTeam.name}</span>
-                      </div>
-                      <p className="text-[11px] text-muted mb-3">{m.venue}</p>
-
-                      {/* Score entry */}
-                      <div className="bg-background rounded-xl p-3">
-                        <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Enter Final Score</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="block text-[10px] text-muted mb-1">{m.homeTeam.name.split(" ")[0]}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              className={inputClass}
-                              value={scoreInputs[m.id]?.home ?? ""}
-                              onChange={(e) =>
-                                setScoreInputs((p) => ({ ...p, [m.id]: { home: e.target.value, away: p[m.id]?.away ?? "" } }))
-                              }
-                            />
+                      {editingId === m.id ? (
+                        /* Edit mode */
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] text-maroon uppercase tracking-wider font-bold">Edit Match</p>
+                            <button onClick={() => setEditingId(null)} className="text-xs text-muted font-medium active:opacity-70">Cancel</button>
                           </div>
-                          <span className="text-muted font-bold text-lg mt-5">-</span>
-                          <div className="flex-1">
-                            <label className="block text-[10px] text-muted mb-1">{m.awayTeam.name.split(" ")[0]}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              className={inputClass}
-                              value={scoreInputs[m.id]?.away ?? ""}
-                              onChange={(e) =>
-                                setScoreInputs((p) => ({ ...p, [m.id]: { home: p[m.id]?.home ?? "", away: e.target.value } }))
-                              }
-                            />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-muted mb-1">Date</label>
+                              <input type="date" value={editForm.date} onChange={(e) => setEditForm((p) => ({ ...p, date: e.target.value }))} className={selectClass} />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-muted mb-1">Time</label>
+                              <input type="time" value={editForm.time} onChange={(e) => setEditForm((p) => ({ ...p, time: e.target.value }))} className={selectClass} />
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2 mt-3">
+                          <div>
+                            <label className="block text-[10px] text-muted mb-1">Venue</label>
+                            <input type="text" value={editForm.venue} onChange={(e) => setEditForm((p) => ({ ...p, venue: e.target.value }))} className={selectClass} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-muted mb-1">Home Team</label>
+                              <select value={editForm.homeTeamId} onChange={(e) => setEditForm((p) => ({ ...p, homeTeamId: e.target.value }))} className={selectClass}>
+                                {teams.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-muted mb-1">Away Team</label>
+                              <select value={editForm.awayTeamId} onChange={(e) => setEditForm((p) => ({ ...p, awayTeamId: e.target.value }))} className={selectClass}>
+                                {teams.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                              </select>
+                            </div>
+                          </div>
                           <button
-                            onClick={() => submitScore(m.id)}
+                            onClick={() => saveEdit(m.id)}
                             disabled={saving === m.id}
-                            className="btn-touch flex-1 bg-maroon text-white text-sm font-semibold py-2.5 rounded-xl active:scale-95 disabled:opacity-50"
+                            className="btn-touch w-full bg-maroon text-white text-sm font-semibold py-2.5 rounded-xl active:scale-95 disabled:opacity-50"
                           >
-                            {saving === m.id ? "Saving..." : "Save Score"}
-                          </button>
-                          <button
-                            onClick={() => deleteMatch(m.id)}
-                            className="btn-touch w-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center active:bg-red-100"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                            </svg>
+                            {saving === m.id ? "Saving..." : "Save Changes"}
                           </button>
                         </div>
-                      </div>
+                      ) : (
+                        /* View mode */
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted font-medium">
+                              {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                              {" \u00B7 "}
+                              {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                            <span className="text-[10px] font-bold text-gold-dark bg-gold/15 px-2 py-0.5 rounded-full">UPCOMING</span>
+                          </div>
+
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-bold text-foreground">{m.homeTeam.name}</span>
+                            <span className="text-xs text-muted font-semibold">vs</span>
+                            <span className="text-sm font-bold text-foreground text-right">{m.awayTeam.name}</span>
+                          </div>
+                          <p className="text-[11px] text-muted mb-3">{m.venue}</p>
+
+                          {/* Edit button */}
+                          <button
+                            onClick={() => startEdit(m)}
+                            className="btn-touch w-full flex items-center justify-center gap-1.5 bg-background-secondary text-foreground-secondary text-xs font-semibold py-2 rounded-xl mb-3 active:bg-card-border"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            Edit Match Details
+                          </button>
+
+                          {/* Score entry */}
+                          <div className="bg-background rounded-xl p-3">
+                            <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Enter Final Score</p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <label className="block text-[10px] text-muted mb-1">{m.homeTeam.name.split(" ")[0]}</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  className={inputClass}
+                                  value={scoreInputs[m.id]?.home ?? ""}
+                                  onChange={(e) =>
+                                    setScoreInputs((p) => ({ ...p, [m.id]: { home: e.target.value, away: p[m.id]?.away ?? "" } }))
+                                  }
+                                />
+                              </div>
+                              <span className="text-muted font-bold text-lg mt-5">-</span>
+                              <div className="flex-1">
+                                <label className="block text-[10px] text-muted mb-1">{m.awayTeam.name.split(" ")[0]}</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  className={inputClass}
+                                  value={scoreInputs[m.id]?.away ?? ""}
+                                  onChange={(e) =>
+                                    setScoreInputs((p) => ({ ...p, [m.id]: { home: p[m.id]?.home ?? "", away: e.target.value } }))
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => submitScore(m.id)}
+                                disabled={saving === m.id}
+                                className="btn-touch flex-1 bg-maroon text-white text-sm font-semibold py-2.5 rounded-xl active:scale-95 disabled:opacity-50"
+                              >
+                                {saving === m.id ? "Saving..." : "Save Score"}
+                              </button>
+                              <button
+                                onClick={() => deleteMatch(m.id)}
+                                className="btn-touch w-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center active:bg-red-100"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
