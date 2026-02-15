@@ -175,31 +175,22 @@ input:focus, select:focus {
   margin: 0 0.35em;
 }
 
-/* FIFA FUT-style player card */
+/* FIFA FUT-style player card — PNG background */
 .fut-card {
-  width: 160px;
-  min-height: 220px;
-  background: linear-gradient(160deg, #D4B04A 0%, #B8942F 30%, #8C6F1E 60%, #7B1A2C 100%);
-  border-radius: 16px;
-  padding: 3px;
   position: relative;
-  box-shadow: 0 4px 20px rgba(123, 26, 44, 0.25), 0 2px 8px rgba(184, 148, 47, 0.2);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 180px;
+  aspect-ratio: 0.72;
+  filter: drop-shadow(0 0 18px rgba(180, 30, 50, 0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.4));
+  transition: transform 0.25s ease, filter 0.25s ease;
 }
-.fut-card::before {
-  content: "";
+.fut-card-content {
   position: absolute;
-  inset: 3px;
-  border-radius: 14px;
-  background: linear-gradient(170deg, #FDF6E3 0%, #F5EDD5 40%, #EDE0BE 100%);
-}
-.fut-card > * {
-  position: relative;
-  z-index: 1;
+  inset: 0;
+  z-index: 2;
 }
 @media (hover: hover) {
   .fut-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 32px rgba(123, 26, 44, 0.3), 0 4px 12px rgba(184, 148, 47, 0.25);
+    transform: translateY(-6px) scale(1.03);
+    filter: drop-shadow(0 0 28px rgba(200, 35, 55, 0.65)) drop-shadow(0 8px 20px rgba(0,0,0,0.5));
   }
 }
