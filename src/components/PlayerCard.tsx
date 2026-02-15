@@ -53,49 +53,43 @@ export default function PlayerCard({
 
       {/* Content overlay */}
       <div className="fut-card-content">
-        {/* === TOP HALF: Rating/Position left + Player image right === */}
-        <div className="absolute top-[6%] left-[8%] bottom-[48%] right-[8%] flex">
-          {/* Left column: Rating, Position, Logo */}
-          <div className="flex flex-col items-center w-[30%] pt-[8%] z-10">
-            <span className="text-[28px] font-black leading-none text-[#D4B04A] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              {rating}
-            </span>
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#D4B04A] drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)] -mt-0.5">
-              {position}
-            </span>
-            {/* Decorative line */}
-            <div className="w-6 h-[2px] bg-[#D4B04A]/40 my-1.5 rounded-full" />
-            {/* Team logo */}
-            <Image
-              src="/logo.png"
-              alt="Chiefs FC"
-              width={28}
-              height={28}
-              className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
-            />
-          </div>
+        {/* === TOP HALF: Rating/Position left + Player image center === */}
+        {/* Left column: Rating, Position, Logo */}
+        <div className="absolute top-[8%] left-[9%] flex flex-col items-center z-10">
+          <span className="text-[26px] font-black leading-none text-[#D4B04A] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+            {rating}
+          </span>
+          <span className="text-[10px] font-extrabold uppercase tracking-wide text-[#D4B04A] drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)] -mt-0.5">
+            {position}
+          </span>
+          <div className="w-5 h-[2px] bg-[#D4B04A]/40 my-1 rounded-full" />
+          <Image
+            src="/logo.png"
+            alt="Chiefs FC"
+            width={24}
+            height={24}
+            className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
+          />
+        </div>
 
-          {/* Right area: Player image cutout */}
-          <div className="flex-1 flex items-end justify-center overflow-hidden">
-            {imageUrl ? (
-              <div className="relative w-full h-full">
-                <Image
-                  src={imageUrl}
-                  alt={name}
-                  fill
-                  className="object-cover object-top"
-                  sizes="150px"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center w-full h-full">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.25}>
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-            )}
-          </div>
+        {/* Player image - centered circle */}
+        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[45%] aspect-square rounded-full overflow-hidden border-2 border-[#D4B04A]/30">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={name}
+              width={90}
+              height={90}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-black/20">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.25}>
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* === BOTTOM HALF: Name + Stats === */}
