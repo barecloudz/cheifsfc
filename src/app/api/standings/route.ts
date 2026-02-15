@@ -6,7 +6,7 @@ export async function GET() {
   const standings = await calculateStandings();
   const teams = await prisma.team.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, manualWon: true, manualDrawn: true, manualLost: true, manualGF: true, manualGA: true },
   });
 
   return NextResponse.json({ standings, teams });

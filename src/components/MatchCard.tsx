@@ -51,11 +51,13 @@ export default function MatchCard({
               weekday: "short",
               month: "short",
               day: "numeric",
+              timeZone: "America/New_York",
             })}
             {" \u00B7 "}
             {matchDate.toLocaleTimeString("en-US", {
               hour: "numeric",
               minute: "2-digit",
+              timeZone: "America/New_York",
             })}
           </span>
           {resultIndicator && (

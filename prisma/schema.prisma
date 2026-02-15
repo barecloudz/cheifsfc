@@ -15,6 +15,11 @@ model Team {
   name        String   @unique
   shortName   String?
   logo        String?
+  manualWon   Int      @default(0)
+  manualDrawn Int      @default(0)
+  manualLost  Int      @default(0)
+  manualGF    Int      @default(0)
+  manualGA    Int      @default(0)
   homeMatches Match[]  @relation("HomeTeam")
   awayMatches Match[]  @relation("AwayTeam")
 }

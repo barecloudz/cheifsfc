@@ -91,11 +91,13 @@ export default async function Home() {
                     weekday: "long",
                     month: "long",
                     day: "numeric",
+                    timeZone: "America/New_York",
                   })}
                   {" \u00B7 "}
                   {nextMatch.date.toLocaleTimeString("en-US", {
                     hour: "numeric",
                     minute: "2-digit",
+                    timeZone: "America/New_York",
                   })}
                 </p>
                 {nextMatch.venue && (

@@ -28,14 +28,14 @@ export async function calculateStandings(): Promise<TeamStanding[]> {
     standings.set(team.id, {
       id: team.id,
       name: team.name,
-      played: 0,
-      won: 0,
-      drawn: 0,
-      lost: 0,
-      goalsFor: 0,
-      goalsAgainst: 0,
+      played: team.manualWon + team.manualDrawn + team.manualLost,
+      won: team.manualWon,
+      drawn: team.manualDrawn,
+      lost: team.manualLost,
+      goalsFor: team.manualGF,
+      goalsAgainst: team.manualGA,
       goalDifference: 0,
-      points: 0,
+      points: (team.manualWon * 3) + team.manualDrawn,
     });
   }
 

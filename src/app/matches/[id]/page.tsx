@@ -77,11 +77,13 @@ export default async function MatchDetailPage({
                   month: "long",
                   day: "numeric",
                   year: "numeric",
+                  timeZone: "America/New_York",
                 })}
                 {" \u00B7 "}
                 {match.date.toLocaleTimeString("en-US", {
                   hour: "numeric",
                   minute: "2-digit",
+                  timeZone: "America/New_York",
                 })}
               </p>
             </div>

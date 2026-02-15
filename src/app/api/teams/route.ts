@@ -28,6 +28,28 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(team, { status: 201 });
 }
 
+export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const { id, manualWon, manualDrawn, manualLost, manualGF, manualGA } = body;
+
+  if (!id) {
+    return NextResponse.json({ error: "Team ID is required" }, { status: 400 });
+  }
+
+  const team = await prisma.team.update({
+    where: { id },
+    data: {
+      manualWon: manualWon ?? 0,
+      manualDrawn: manualDrawn ?? 0,
+      manualLost: manualLost ?? 0,
+      manualGF: manualGF ?? 0,
+      manualGA: manualGA ?? 0,
+    },
+  });
+
+  return NextResponse.json(team);
+}
+
 export async function DELETE(request: NextRequest) {
   const body = await request.json();
   const { id } = body;

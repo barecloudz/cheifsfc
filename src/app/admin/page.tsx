@@ -8,6 +8,11 @@ import AdminMatchForm from "@/components/AdminMatchForm";
 interface Team {
   id: number;
   name: string;
+  manualWon: number;
+  manualDrawn: number;
+  manualLost: number;
+  manualGF: number;
+  manualGA: number;
 }
 
 interface MatchData {
@@ -81,6 +86,9 @@ export default function AdminDashboard() {
   // Table management state
   const [newTeamName, setNewTeamName] = useState("");
   const [addingTeam, setAddingTeam] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [statForm, setStatForm] = useState({ won: "0", drawn: "0", lost: "0", gf: "0", ga: "0" });
+  const [savingStats, setSavingStats] = useState(false);
   const [quickHome, setQuickHome] = useState("");
   const [quickAway, setQuickAway] = useState("");
   const [quickHomeScore, setQuickHomeScore] = useState("");
@@ -137,8 +145,8 @@ export default function AdminDashboard() {
 
   function startEdit(m: MatchData) {
     const d = new Date(m.date);
-    const dateStr = d.toISOString().split("T")[0];
-    const timeStr = d.toTimeString().slice(0, 5);
+    const dateStr = d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    const timeStr = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/New_York" });
     setEditForm({
       date: dateStr,
       time: timeStr,
@@ -196,6 +204,37 @@ export default function AdminDashboard() {
       body: JSON.stringify({ id: teamId }),
     });
     showToast("Team removed");
+    loadData();
+  }
+
+  function startEditStats(team: Team) {
+    setStatForm({
+      won: String(team.manualWon),
+      drawn: String(team.manualDrawn),
+      lost: String(team.manualLost),
+      gf: String(team.manualGF),
+      ga: String(team.manualGA),
+    });
+    setEditingTeamId(team.id);
+  }
+
+  async function saveStats(teamId: number) {
+    setSavingStats(true);
+    await fetch("/api/teams", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: teamId,
+        manualWon: parseInt(statForm.won) || 0,
+        manualDrawn: parseInt(statForm.drawn) || 0,
+        manualLost: parseInt(statForm.lost) || 0,
+        manualGF: parseInt(statForm.gf) || 0,
+        manualGA: parseInt(statForm.ga) || 0,
+      }),
+    });
+    setSavingStats(false);
+    setEditingTeamId(null);
+    showToast("Stats updated");
     loadData();
   }
 
@@ -482,9 +521,9 @@ export default function AdminDashboard() {
                     </div>
                     <div className="bg-background rounded-xl p-3 text-center">
                       <p className="text-xs text-muted font-medium">
-                        {matchDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                        {matchDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/New_York" })}
                         {" \u00B7 "}
-                        {matchDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        {matchDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
                       </p>
                       <p className="text-[11px] text-muted/60 mt-0.5">{next.venue}</p>
                     </div>
@@ -782,19 +821,68 @@ export default function AdminDashboard() {
 
                 <div className="space-y-0.5">
                   {teams.map((team) => (
-                    <div key={team.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-background-secondary transition-colors group">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center text-[10px] font-bold text-muted group-hover:bg-white">
-                          {team.name.charAt(0)}
+                    <div key={team.id} className="rounded-xl hover:bg-background-secondary transition-colors group">
+                      <div className="flex items-center justify-between py-2.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center text-[10px] font-bold text-muted group-hover:bg-white">
+                            {team.name.charAt(0)}
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-foreground">{team.name}</span>
+                            {(team.manualWon > 0 || team.manualDrawn > 0 || team.manualLost > 0) && (
+                              <p className="text-[10px] text-muted">+{team.manualWon}W {team.manualDrawn}D {team.manualLost}L manual</p>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-sm font-medium text-foreground">{team.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => editingTeamId === team.id ? setEditingTeamId(null) : startEditStats(team)}
+                            className="btn-touch text-[11px] text-maroon font-medium px-2 py-1 rounded-lg hover:bg-maroon/5 active:bg-maroon/10 transition-all"
+                          >
+                            {editingTeamId === team.id ? "Cancel" : "Edit Stats"}
+                          </button>
+                          <button
+                            onClick={() => deleteTeam(team.id, team.name)}
+                            className="btn-touch text-[11px] text-red-500 font-medium opacity-0 group-hover:opacity-100 hover:text-red-700 transition-all px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => deleteTeam(team.id, team.name)}
-                        className="btn-touch text-[11px] text-red-500 font-medium opacity-0 group-hover:opacity-100 hover:text-red-700 transition-all px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100"
-                      >
-                        Remove
-                      </button>
+                      {editingTeamId === team.id && (
+                        <div className="px-3 pb-3">
+                          <div className="bg-background rounded-xl p-3">
+                            <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Manual Stats (added to match results)</p>
+                            <div className="grid grid-cols-5 gap-2 mb-3">
+                              {[
+                                { label: "W", key: "won" as const },
+                                { label: "D", key: "drawn" as const },
+                                { label: "L", key: "lost" as const },
+                                { label: "GF", key: "gf" as const },
+                                { label: "GA", key: "ga" as const },
+                              ].map((field) => (
+                                <div key={field.key}>
+                                  <label className="block text-[9px] text-muted uppercase tracking-wider font-medium mb-1 text-center">{field.label}</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={statForm[field.key]}
+                                    onChange={(e) => setStatForm((p) => ({ ...p, [field.key]: e.target.value }))}
+                                    className="w-full bg-white border border-card-border rounded-lg px-2 py-2 text-sm text-center text-foreground font-bold focus:outline-none focus:border-maroon transition-colors"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={() => saveStats(team.id)}
+                              disabled={savingStats}
+                              className="btn-touch w-full bg-maroon-gradient text-white text-xs font-semibold py-2 rounded-lg active:scale-[0.98] disabled:opacity-50"
+                            >
+                              {savingStats ? "Saving..." : "Save Stats"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -874,9 +962,9 @@ export default function AdminDashboard() {
                         <>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-muted font-medium">
-                              {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                              {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })}
                               {" \u00B7 "}
-                              {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                              {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
                             </span>
                             <button
                               onClick={() => startEdit(m)}
@@ -953,7 +1041,7 @@ export default function AdminDashboard() {
                       <div className="p-4">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-muted font-medium">
-                            {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                            {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })}
                           </span>
                           <span className="text-[10px] font-bold text-maroon bg-maroon/8 px-2.5 py-0.5 rounded-full">FT</span>
                         </div>
