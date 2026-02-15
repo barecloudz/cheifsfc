@@ -18,7 +18,6 @@ interface PlayerCardProps {
 export default function PlayerCard({
   name,
   position,
-  number,
   imageUrl,
   pace,
   shooting,
@@ -29,76 +28,121 @@ export default function PlayerCard({
 }: PlayerCardProps) {
   const rating = Math.round((pace + shooting + passing + dribbling + defending + physical) / 6);
 
+  const leftStats = [
+    { label: "PAC", value: pace },
+    { label: "SHO", value: shooting },
+    { label: "PAS", value: passing },
+  ];
+  const rightStats = [
+    { label: "DRI", value: dribbling },
+    { label: "DEF", value: defending },
+    { label: "PHY", value: physical },
+  ];
+
   return (
     <div className="fut-card">
-      {/* Card frame image */}
+      {/* Card frame PNG */}
       <Image
         src="/futcard.png"
         alt=""
         fill
         className="object-contain pointer-events-none select-none"
-        sizes="200px"
+        sizes="220px"
         priority
       />
 
       {/* Content overlay */}
       <div className="fut-card-content">
-        {/* Rating + Position column */}
-        <div className="absolute left-[14%] top-[12%] flex flex-col items-center">
-          <span className="text-[26px] font-black leading-none text-[#D4B04A] drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
-            {rating}
-          </span>
-          <span className="text-[9px] font-bold uppercase tracking-widest text-[#D4B04A]/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
-            {position}
-          </span>
-          {number != null && (
-            <span className="text-[8px] font-bold text-[#D4B04A]/50 mt-0.5">#{number}</span>
-          )}
-        </div>
-
-        {/* Player image - centered in upper area */}
-        <div className="absolute top-[14%] left-1/2 -translate-x-1/2 w-[55%] aspect-square rounded-full overflow-hidden border-2 border-[#D4B04A]/25 bg-black/20 flex items-center justify-center">
-          {imageUrl ? (
+        {/* === TOP HALF: Rating/Position left + Player image right === */}
+        <div className="absolute top-[6%] left-[8%] bottom-[48%] right-[8%] flex">
+          {/* Left column: Rating, Position, Logo */}
+          <div className="flex flex-col items-center w-[30%] pt-[8%] z-10">
+            <span className="text-[28px] font-black leading-none text-[#D4B04A] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              {rating}
+            </span>
+            <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#D4B04A] drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)] -mt-0.5">
+              {position}
+            </span>
+            {/* Decorative line */}
+            <div className="w-6 h-[2px] bg-[#D4B04A]/40 my-1.5 rounded-full" />
+            {/* Team logo */}
             <Image
-              src={imageUrl}
-              alt={name}
-              width={100}
-              height={100}
-              className="w-full h-full object-cover"
+              src="/logo.png"
+              alt="Chiefs FC"
+              width={28}
+              height={28}
+              className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]"
             />
-          ) : (
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.3}>
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          )}
+          </div>
+
+          {/* Right area: Player image cutout */}
+          <div className="flex-1 flex items-end justify-center overflow-hidden">
+            {imageUrl ? (
+              <div className="relative w-full h-full">
+                <Image
+                  src={imageUrl}
+                  alt={name}
+                  fill
+                  className="object-cover object-top"
+                  sizes="150px"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full h-full">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.25}>
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Bottom section: name + stats */}
-        <div className="absolute bottom-[8%] left-[10%] right-[10%] flex flex-col items-center">
-          {/* Gold divider */}
-          <div className="w-4/5 h-[1px] bg-gradient-to-r from-transparent via-[#D4B04A]/60 to-transparent mb-1.5" />
+        {/* === BOTTOM HALF: Name + Stats === */}
+        <div className="absolute top-[52%] left-[8%] right-[8%] bottom-[6%] flex flex-col items-center">
+          {/* Divider */}
+          <div className="w-3/5 h-[1px] bg-gradient-to-r from-transparent via-[#D4B04A]/50 to-transparent mb-1" />
 
           {/* Player name */}
-          <h3 className="text-[11px] font-extrabold uppercase tracking-wider text-[#D4B04A] text-center leading-tight truncate max-w-full drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)] mb-2">
+          <h3 className="text-[13px] font-black uppercase tracking-wider text-[#D4B04A] text-center leading-tight truncate max-w-full drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] mb-1">
             {name}
           </h3>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-x-4 gap-y-0 w-full">
-            {[
-              { label: "PAC", value: pace },
-              { label: "SHO", value: shooting },
-              { label: "PAS", value: passing },
-              { label: "DRI", value: dribbling },
-              { label: "DEF", value: defending },
-              { label: "PHY", value: physical },
-            ].map((stat) => (
-              <div key={stat.label} className="flex items-center justify-between">
-                <span className="text-[7px] font-bold text-[#D4B04A]/50 uppercase">{stat.label}</span>
-                <span className="text-[9px] font-black text-[#E8D5A3] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{stat.value}</span>
-              </div>
-            ))}
+          {/* Divider */}
+          <div className="w-4/5 h-[1px] bg-gradient-to-r from-transparent via-[#D4B04A]/40 to-transparent mb-1.5" />
+
+          {/* Two-column stats */}
+          <div className="flex w-full flex-1 items-start">
+            {/* Left column */}
+            <div className="flex-1 flex flex-col items-center gap-0">
+              {leftStats.map((s) => (
+                <div key={s.label} className="flex items-baseline gap-1">
+                  <span className="text-[13px] font-black text-[#E8D5A3] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                    {s.value}
+                  </span>
+                  <span className="text-[8px] font-bold text-[#D4B04A]/60 uppercase">
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Vertical divider */}
+            <div className="w-[1px] h-[80%] bg-gradient-to-b from-transparent via-[#D4B04A]/40 to-transparent self-center" />
+
+            {/* Right column */}
+            <div className="flex-1 flex flex-col items-center gap-0">
+              {rightStats.map((s) => (
+                <div key={s.label} className="flex items-baseline gap-1">
+                  <span className="text-[13px] font-black text-[#E8D5A3] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                    {s.value}
+                  </span>
+                  <span className="text-[8px] font-bold text-[#D4B04A]/60 uppercase">
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
