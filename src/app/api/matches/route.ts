@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { id, homeScore, awayScore, date, venue, homeTeamId, awayTeamId } = body;
+  const { id, homeScore, awayScore, date, venue, homeTeamId, awayTeamId, cancelled, cancelReason } = body;
 
   const data: Record<string, unknown> = {};
   if (homeScore !== undefined) data.homeScore = homeScore;
@@ -67,6 +67,8 @@ export async function PATCH(request: NextRequest) {
   if (venue !== undefined) data.venue = venue;
   if (homeTeamId !== undefined) data.homeTeamId = homeTeamId;
   if (awayTeamId !== undefined) data.awayTeamId = awayTeamId;
+  if (cancelled !== undefined) data.cancelled = cancelled;
+  if (cancelReason !== undefined) data.cancelReason = cancelReason;
 
   const match = await prisma.match.update({
     where: { id },

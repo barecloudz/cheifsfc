@@ -33,7 +33,11 @@ export default async function MatchDetailPage({
           <div className="p-6">
             {/* Status badge */}
             <div className="text-center mb-5">
-              {played ? (
+              {match.cancelled ? (
+                <span className="inline-block bg-gray-100 text-gray-500 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                  Cancelled{match.cancelReason ? ` \u2014 ${match.cancelReason}` : ""}
+                </span>
+              ) : played ? (
                 <span className="inline-block bg-maroon/10 text-maroon text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                   Full Time
                 </span>
@@ -45,14 +49,16 @@ export default async function MatchDetailPage({
             </div>
 
             {/* Teams & score */}
-            <div className="flex items-center justify-center gap-5 mb-6">
+            <div className={`flex items-center justify-center gap-5 mb-6 ${match.cancelled ? "opacity-50" : ""}`}>
               <div className="flex-1 text-center">
                 <TeamAvatar name={match.homeTeam.name} />
                 <p className="text-[10px] text-muted uppercase tracking-wider mt-1">Home</p>
               </div>
 
               <div className="text-center min-w-[70px]">
-                {played ? (
+                {match.cancelled ? (
+                  <div className="text-lg font-bold text-gray-400">CANC</div>
+                ) : played ? (
                   <div className="text-4xl font-bold text-foreground">
                     {match.homeScore}
                     <span className="text-gray mx-0.5">-</span>

@@ -11,6 +11,8 @@ interface MatchData {
   awayTeam: { name: string };
   homeScore: number | null;
   awayScore: number | null;
+  cancelled: boolean;
+  cancelReason: string | null;
 }
 
 type Filter = "upcoming" | "past";
@@ -79,6 +81,8 @@ export default function SchedulePage() {
               awayTeam={m.awayTeam.name}
               homeScore={m.homeScore}
               awayScore={m.awayScore}
+              cancelled={m.cancelled}
+              cancelReason={m.cancelReason}
             />
           ))}
         </div>

@@ -9,6 +9,8 @@ interface MatchCardProps {
   awayTeam: string;
   homeScore: number | null;
   awayScore: number | null;
+  cancelled?: boolean;
+  cancelReason?: string | null;
 }
 
 export default function MatchCard({
@@ -19,6 +21,8 @@ export default function MatchCard({
   awayTeam,
   homeScore,
   awayScore,
+  cancelled,
+  cancelReason,
 }: MatchCardProps) {
   const matchDate = new Date(date);
   const played = homeScore !== null && awayScore !== null;
@@ -60,7 +64,11 @@ export default function MatchCard({
               timeZone: "America/New_York",
             })}
           </span>
-          {resultIndicator && (
+          {cancelled ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-gray-100 text-gray-500 border-gray-200">
+              CANCELLED
+            </span>
+          ) : resultIndicator && (
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${resultColors[resultIndicator]}`}
             >
@@ -76,7 +84,9 @@ export default function MatchCard({
             <p className="font-semibold text-sm text-foreground">{homeTeam}</p>
           </div>
           <div className="px-3 text-center min-w-[60px]">
-            {played ? (
+            {cancelled ? (
+              <span className="text-xs text-gray-400 font-medium">{cancelReason || "Cancelled"}</span>
+            ) : played ? (
               <span className="text-xl font-bold text-maroon">
                 {homeScore} - {awayScore}
               </span>

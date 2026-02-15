@@ -15,6 +15,7 @@ export default async function Home() {
     where: {
       date: { gte: now },
       homeScore: null,
+      cancelled: false,
     },
     orderBy: { date: "asc" },
     include: { homeTeam: true, awayTeam: true },

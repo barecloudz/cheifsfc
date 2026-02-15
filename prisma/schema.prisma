@@ -25,15 +25,17 @@ model Team {
 }
 
 model Match {
-  id         Int       @id @default(autoincrement())
-  date       DateTime
-  venue      String
-  homeTeamId Int
-  awayTeamId Int
-  homeScore  Int?
-  awayScore  Int?
-  homeTeam   Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam   Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           Int       @id @default(autoincrement())
+  date         DateTime
+  venue        String
+  homeTeamId   Int
+  awayTeamId   Int
+  homeScore    Int?
+  awayScore    Int?
+  cancelled    Boolean   @default(false)
+  cancelReason String?
+  homeTeam     Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

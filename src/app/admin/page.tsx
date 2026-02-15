@@ -25,6 +25,8 @@ interface MatchData {
   awayTeam: { name: string };
   homeScore: number | null;
   awayScore: number | null;
+  cancelled: boolean;
+  cancelReason: string | null;
 }
 
 interface EditForm {
@@ -129,6 +131,31 @@ export default function AdminDashboard() {
     setScoreInputs((p) => { const n = { ...p }; delete n[matchId]; return n; });
     setSaving(null);
     showToast("Score saved");
+    loadData();
+  }
+
+  async function cancelMatch(matchId: number) {
+    const reasons = ["Weather", "Waterlogged pitch", "Team no-show", "Other"];
+    const reason = prompt(`Cancel reason?\n\n${reasons.map((r, i) => `${i + 1}. ${r}`).join("\n")}\n\nType a number or your own reason:`);
+    if (reason === null) return;
+    const idx = parseInt(reason) - 1;
+    const finalReason = idx >= 0 && idx < reasons.length ? reasons[idx] : reason.trim() || "Cancelled";
+    await fetch("/api/matches", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: matchId, cancelled: true, cancelReason: finalReason }),
+    });
+    showToast("Match cancelled");
+    loadData();
+  }
+
+  async function uncancelMatch(matchId: number) {
+    await fetch("/api/matches", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: matchId, cancelled: false, cancelReason: null }),
+    });
+    showToast("Match restored");
     loadData();
   }
 
@@ -907,8 +934,8 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-3">
                   {upcoming.map((m) => (
-                    <div key={m.id} className="card-premium overflow-hidden">
-                      <div className="h-1 bg-gold/40" />
+                    <div key={m.id} className={`card-premium overflow-hidden ${m.cancelled ? "opacity-60" : ""}`}>
+                      <div className={`h-1 ${m.cancelled ? "bg-gray-300" : "bg-gold/40"}`} />
                       <div className="p-4">
                       {editingId === m.id ? (
                         <div className="space-y-3">
@@ -961,11 +988,18 @@ export default function AdminDashboard() {
                       ) : (
                         <>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-muted font-medium">
-                              {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })}
-                              {" \u00B7 "}
-                              {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted font-medium">
+                                {new Date(m.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })}
+                                {" \u00B7 "}
+                                {new Date(m.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
+                              </span>
+                              {m.cancelled && (
+                                <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full uppercase">
+                                  {m.cancelReason || "Cancelled"}
+                                </span>
+                              )}
+                            </div>
                             <button
                               onClick={() => startEdit(m)}
                               className="text-[10px] text-maroon font-semibold flex items-center gap-1 active:opacity-70 hover:underline"
@@ -979,32 +1013,19 @@ export default function AdminDashboard() {
                           </div>
 
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-bold text-foreground">{m.homeTeam.name}</span>
+                            <span className={`text-sm font-bold ${m.cancelled ? "text-gray-400 line-through" : "text-foreground"}`}>{m.homeTeam.name}</span>
                             <span className="text-xs text-muted font-semibold">vs</span>
-                            <span className="text-sm font-bold text-foreground text-right">{m.awayTeam.name}</span>
+                            <span className={`text-sm font-bold text-right ${m.cancelled ? "text-gray-400 line-through" : "text-foreground"}`}>{m.awayTeam.name}</span>
                           </div>
                           <p className="text-[11px] text-muted mb-3">{m.venue}</p>
 
-                          <div className="bg-background rounded-xl p-3">
-                            <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Enter Final Score</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1">
-                                <label className="block text-[10px] text-muted mb-1">{m.homeTeam.name.split(" ")[0]}</label>
-                                <input type="number" min="0" placeholder="0" className={inputClass} value={scoreInputs[m.id]?.home ?? ""} onChange={(e) => setScoreInputs((p) => ({ ...p, [m.id]: { home: e.target.value, away: p[m.id]?.away ?? "" } }))} />
-                              </div>
-                              <span className="text-muted font-bold text-lg mt-5">-</span>
-                              <div className="flex-1">
-                                <label className="block text-[10px] text-muted mb-1">{m.awayTeam.name.split(" ")[0]}</label>
-                                <input type="number" min="0" placeholder="0" className={inputClass} value={scoreInputs[m.id]?.away ?? ""} onChange={(e) => setScoreInputs((p) => ({ ...p, [m.id]: { home: p[m.id]?.home ?? "", away: e.target.value } }))} />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 mt-3">
+                          {m.cancelled ? (
+                            <div className="flex gap-2">
                               <button
-                                onClick={() => submitScore(m.id)}
-                                disabled={saving === m.id}
-                                className="btn-touch flex-1 bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-50 shadow-sm shadow-maroon/15"
+                                onClick={() => uncancelMatch(m.id)}
+                                className="btn-touch flex-1 bg-foreground text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98]"
                               >
-                                {saving === m.id ? "Saving..." : "Save Score"}
+                                Restore Match
                               </button>
                               <button
                                 onClick={() => deleteMatch(m.id)}
@@ -1016,7 +1037,51 @@ export default function AdminDashboard() {
                                 </svg>
                               </button>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="bg-background rounded-xl p-3">
+                              <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Enter Final Score</p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                  <label className="block text-[10px] text-muted mb-1">{m.homeTeam.name.split(" ")[0]}</label>
+                                  <input type="number" min="0" placeholder="0" className={inputClass} value={scoreInputs[m.id]?.home ?? ""} onChange={(e) => setScoreInputs((p) => ({ ...p, [m.id]: { home: e.target.value, away: p[m.id]?.away ?? "" } }))} />
+                                </div>
+                                <span className="text-muted font-bold text-lg mt-5">-</span>
+                                <div className="flex-1">
+                                  <label className="block text-[10px] text-muted mb-1">{m.awayTeam.name.split(" ")[0]}</label>
+                                  <input type="number" min="0" placeholder="0" className={inputClass} value={scoreInputs[m.id]?.away ?? ""} onChange={(e) => setScoreInputs((p) => ({ ...p, [m.id]: { home: p[m.id]?.home ?? "", away: e.target.value } }))} />
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3">
+                                <button
+                                  onClick={() => submitScore(m.id)}
+                                  disabled={saving === m.id}
+                                  className="btn-touch flex-1 bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-50 shadow-sm shadow-maroon/15"
+                                >
+                                  {saving === m.id ? "Saving..." : "Save Score"}
+                                </button>
+                                <button
+                                  onClick={() => cancelMatch(m.id)}
+                                  className="btn-touch w-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center active:bg-amber-100 hover:text-amber-700 transition-colors"
+                                  title="Cancel match"
+                                >
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="15" y1="9" x2="9" y2="15" />
+                                    <line x1="9" y1="9" x2="15" y2="15" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => deleteMatch(m.id)}
+                                  className="btn-touch w-11 bg-red-50 text-red-500 rounded-xl flex items-center justify-center active:bg-red-100 hover:text-red-700 transition-colors"
+                                >
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                       </div>
