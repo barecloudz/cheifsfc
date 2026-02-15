@@ -174,3 +174,32 @@ input:focus, select:focus {
   content: "\00B7";
   margin: 0 0.35em;
 }
+
+/* FIFA FUT-style player card */
+.fut-card {
+  width: 160px;
+  min-height: 220px;
+  background: linear-gradient(160deg, #D4B04A 0%, #B8942F 30%, #8C6F1E 60%, #7B1A2C 100%);
+  border-radius: 16px;
+  padding: 3px;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(123, 26, 44, 0.25), 0 2px 8px rgba(184, 148, 47, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fut-card::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 14px;
+  background: linear-gradient(170deg, #FDF6E3 0%, #F5EDD5 40%, #EDE0BE 100%);
+}
+.fut-card > * {
+  position: relative;
+  z-index: 1;
+}
+@media (hover: hover) {
+  .fut-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(123, 26, 44, 0.3), 0 4px 12px rgba(184, 148, 47, 0.25);
+  }
+}

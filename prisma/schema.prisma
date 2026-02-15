@@ -39,3 +39,24 @@ model Match {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
+
+model Player {
+  id        Int      @id @default(autoincrement())
+  name      String
+  position  String
+  number    Int?
+  imageUrl  String?
+  pace      Int      @default(50)
+  shooting  Int      @default(50)
+  passing   Int      @default(50)
+  dribbling Int      @default(50)
+  defending Int      @default(50)
+  physical  Int      @default(50)
+  createdAt DateTime @default(now())
+}
+
+model SiteSettings {
+  id            Int      @id @default(1)
+  teamPhotoUrl  String?
+  playerCardsOn Boolean  @default(false)
+}

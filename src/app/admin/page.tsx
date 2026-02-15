@@ -50,7 +50,26 @@ interface Standing {
   points: number;
 }
 
-type Tab = "dashboard" | "schedule" | "add" | "table";
+interface PlayerData {
+  id: number;
+  name: string;
+  position: string;
+  number: number | null;
+  imageUrl: string | null;
+  pace: number;
+  shooting: number;
+  passing: number;
+  dribbling: number;
+  defending: number;
+  physical: number;
+}
+
+interface SiteSettingsData {
+  teamPhotoUrl: string | null;
+  playerCardsOn: boolean;
+}
+
+type Tab = "dashboard" | "schedule" | "add" | "table" | "team";
 
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
@@ -97,6 +116,19 @@ export default function AdminDashboard() {
   const [quickAwayScore, setQuickAwayScore] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
 
+  // Team management state
+  const [players, setPlayers] = useState<PlayerData[]>([]);
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false });
+  const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
+  const [addingPlayer, setAddingPlayer] = useState(false);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
+  const [uploadingPlayerPhoto, setUploadingPlayerPhoto] = useState(false);
+  const [playerForm, setPlayerForm] = useState({
+    name: "", position: "CM", number: "", imageUrl: "",
+    pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
+  });
+
   const showToast = useCallback((msg: string) => setToast(msg), []);
 
   useEffect(() => {
@@ -117,6 +149,8 @@ export default function AdminDashboard() {
       if (data.teams) setTeams(data.teams);
       if (data.standings) setStandings(data.standings);
     });
+    fetch("/api/players").then((r) => r.json()).then(setPlayers);
+    fetch("/api/settings").then((r) => r.json()).then(setSiteSettings);
   }
 
   async function submitScore(matchId: number) {
@@ -289,6 +323,137 @@ export default function AdminDashboard() {
     loadData();
   }
 
+  async function handleTeamPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingTeamPhoto(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.url) {
+      await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamPhotoUrl: data.url }),
+      });
+      setSiteSettings((s) => ({ ...s, teamPhotoUrl: data.url }));
+      showToast("Team photo uploaded");
+    }
+    setUploadingTeamPhoto(false);
+    e.target.value = "";
+  }
+
+  async function removeTeamPhoto() {
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamPhotoUrl: null }),
+    });
+    setSiteSettings((s) => ({ ...s, teamPhotoUrl: null }));
+    showToast("Team photo removed");
+  }
+
+  async function togglePlayerCards(on: boolean) {
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerCardsOn: on }),
+    });
+    setSiteSettings((s) => ({ ...s, playerCardsOn: on }));
+    showToast(on ? "Player cards enabled" : "Player cards disabled");
+  }
+
+  async function handlePlayerPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPlayerPhoto(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.url) {
+      setPlayerForm((f) => ({ ...f, imageUrl: data.url }));
+    }
+    setUploadingPlayerPhoto(false);
+    e.target.value = "";
+  }
+
+  function resetPlayerForm() {
+    setPlayerForm({
+      name: "", position: "CM", number: "", imageUrl: "",
+      pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
+    });
+    setShowAddPlayer(false);
+    setEditingPlayerId(null);
+  }
+
+  async function savePlayer() {
+    if (!playerForm.name.trim() || !playerForm.position) return;
+    setAddingPlayer(true);
+    const payload = {
+      name: playerForm.name.trim(),
+      position: playerForm.position,
+      number: playerForm.number ? parseInt(playerForm.number) : null,
+      imageUrl: playerForm.imageUrl || null,
+      pace: playerForm.pace,
+      shooting: playerForm.shooting,
+      passing: playerForm.passing,
+      dribbling: playerForm.dribbling,
+      defending: playerForm.defending,
+      physical: playerForm.physical,
+    };
+
+    if (editingPlayerId) {
+      await fetch("/api/players", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingPlayerId, ...payload }),
+      });
+      showToast("Player updated");
+    } else {
+      await fetch("/api/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showToast("Player added");
+    }
+    setAddingPlayer(false);
+    resetPlayerForm();
+    loadData();
+  }
+
+  function startEditPlayer(p: PlayerData) {
+    setPlayerForm({
+      name: p.name,
+      position: p.position,
+      number: p.number ? String(p.number) : "",
+      imageUrl: p.imageUrl || "",
+      pace: p.pace,
+      shooting: p.shooting,
+      passing: p.passing,
+      dribbling: p.dribbling,
+      defending: p.defending,
+      physical: p.physical,
+    });
+    setEditingPlayerId(p.id);
+    setShowAddPlayer(true);
+  }
+
+  async function deletePlayer(id: number, name: string) {
+    if (!confirm(`Delete ${name}?`)) return;
+    await fetch("/api/players", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    showToast("Player removed");
+    loadData();
+  }
+
+  const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
+
   if (!authenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -308,6 +473,7 @@ export default function AdminDashboard() {
     schedule: "Manage Matches",
     add: "Add New Match",
     table: "Manage Table",
+    team: "Manage Team",
   };
 
   const menuItems: { id: Tab; label: string; iconSvg: React.ReactNode }[] = [
@@ -357,6 +523,18 @@ export default function AdminDashboard() {
           <path d="M10 22V10" />
           <path d="M14 22V10" />
           <path d="M6 9h12v4a8 8 0 01-12 0V9z" />
+        </svg>
+      ),
+    },
+    {
+      id: "team",
+      label: "Manage Team",
+      iconSvg: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 00-3-3.87" />
+          <path d="M16 3.13a4 4 0 010 7.75" />
         </svg>
       ),
     },
@@ -916,6 +1094,279 @@ export default function AdminDashboard() {
                 {teams.length === 0 && (
                   <p className="text-center text-muted text-sm py-4">No teams added yet</p>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MANAGE TEAM */}
+        {tab === "team" && (
+          <div className="space-y-4 animate-fadeInUp">
+            {/* Team Photo Section */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-maroon-gradient" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Team Photo</h2>
+                </div>
+
+                {siteSettings.teamPhotoUrl ? (
+                  <div className="space-y-3">
+                    <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-background-secondary">
+                      <Image
+                        src={siteSettings.teamPhotoUrl}
+                        alt="Team photo"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 600px"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="btn-touch flex-1 bg-background-secondary text-foreground text-sm font-semibold py-2.5 rounded-xl text-center cursor-pointer active:scale-[0.98]">
+                        {uploadingTeamPhoto ? "Uploading..." : "Replace Photo"}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
+                      </label>
+                      <button
+                        onClick={removeTeamPhoto}
+                        className="btn-touch px-4 bg-red-50 text-red-500 text-sm font-semibold rounded-xl active:scale-[0.98]"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block w-full border-2 border-dashed border-card-border rounded-xl p-8 text-center cursor-pointer hover:border-maroon/30 transition-colors">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      {uploadingTeamPhoto ? "Uploading..." : "Upload Team Photo"}
+                    </p>
+                    <p className="text-xs text-muted">Click to select an image</p>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Player Cards Toggle */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-gold/40" />
+              <div className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h2 className="text-sm font-bold text-foreground">Player Cards</h2>
+                      <p className="text-[11px] text-muted">Show FUT-style cards on /team page</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => togglePlayerCards(!siteSettings.playerCardsOn)}
+                    className={`relative w-12 h-7 rounded-full transition-colors ${
+                      siteSettings.playerCardsOn ? "bg-maroon" : "bg-background-secondary"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                        siteSettings.playerCardsOn ? "left-6" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Player Management */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-background-secondary" />
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                      </svg>
+                    </span>
+                    <h2 className="text-sm font-bold text-foreground">Players ({players.length})</h2>
+                  </div>
+                  <button
+                    onClick={() => { resetPlayerForm(); setShowAddPlayer(true); }}
+                    className="btn-touch text-xs font-semibold text-maroon bg-maroon/8 px-3 py-1.5 rounded-lg active:scale-95"
+                  >
+                    + Add Player
+                  </button>
+                </div>
+
+                {/* Add/Edit Player Form */}
+                {showAddPlayer && (
+                  <div className="bg-background rounded-xl p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-foreground">{editingPlayerId ? "Edit Player" : "New Player"}</p>
+                      <button onClick={resetPlayerForm} className="text-xs text-muted font-medium active:opacity-70">Cancel</button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>Name</label>
+                          <input
+                            type="text"
+                            value={playerForm.name}
+                            onChange={(e) => setPlayerForm((f) => ({ ...f, name: e.target.value }))}
+                            placeholder="Player name"
+                            className={selectClass}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Position</label>
+                          <select
+                            value={playerForm.position}
+                            onChange={(e) => setPlayerForm((f) => ({ ...f, position: e.target.value }))}
+                            className={selectClass}
+                          >
+                            {positions.map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>Jersey #</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="99"
+                            value={playerForm.number}
+                            onChange={(e) => setPlayerForm((f) => ({ ...f, number: e.target.value }))}
+                            placeholder="Optional"
+                            className={selectClass}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Photo</label>
+                          {playerForm.imageUrl ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-background-secondary">
+                                <Image src={playerForm.imageUrl} alt="" width={36} height={36} className="w-full h-full object-cover" />
+                              </div>
+                              <button
+                                onClick={() => setPlayerForm((f) => ({ ...f, imageUrl: "" }))}
+                                className="text-[10px] text-red-500 font-medium"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="block">
+                              <span className={selectClass + " block text-center cursor-pointer text-muted"}>
+                                {uploadingPlayerPhoto ? "Uploading..." : "Choose file"}
+                              </span>
+                              <input type="file" accept="image/*" className="hidden" onChange={handlePlayerPhotoUpload} disabled={uploadingPlayerPhoto} />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stats sliders */}
+                      <div>
+                        <label className={labelClass}>Stats</label>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                          {[
+                            { label: "PAC", key: "pace" as const },
+                            { label: "SHO", key: "shooting" as const },
+                            { label: "PAS", key: "passing" as const },
+                            { label: "DRI", key: "dribbling" as const },
+                            { label: "DEF", key: "defending" as const },
+                            { label: "PHY", key: "physical" as const },
+                          ].map((stat) => (
+                            <div key={stat.key} className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-muted w-7">{stat.label}</span>
+                              <input
+                                type="range"
+                                min="1"
+                                max="99"
+                                value={playerForm[stat.key]}
+                                onChange={(e) => setPlayerForm((f) => ({ ...f, [stat.key]: parseInt(e.target.value) }))}
+                                className="flex-1 accent-maroon h-1.5"
+                              />
+                              <span className="text-xs font-bold text-foreground w-6 text-right">{playerForm[stat.key]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={savePlayer}
+                        disabled={addingPlayer || !playerForm.name.trim()}
+                        className="btn-touch w-full bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-40 shadow-sm shadow-maroon/15"
+                      >
+                        {addingPlayer ? "Saving..." : editingPlayerId ? "Update Player" : "Add Player"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Player list */}
+                <div className="space-y-0.5">
+                  {players.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-background-secondary transition-colors group">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-background-secondary flex items-center justify-center border border-card-border">
+                          {p.imageUrl ? (
+                            <Image src={p.imageUrl} alt={p.name} width={36} height={36} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xs font-bold text-muted">{p.name.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{p.name}</p>
+                          <p className="text-[10px] text-muted">
+                            {p.position}
+                            {p.number != null && ` · #${p.number}`}
+                            {" · "}
+                            {Math.round((p.pace + p.shooting + p.passing + p.dribbling + p.defending + p.physical) / 6)} OVR
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEditPlayer(p)}
+                          className="btn-touch text-[11px] text-maroon font-medium px-2 py-1 rounded-lg hover:bg-maroon/5 active:bg-maroon/10 transition-all"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deletePlayer(p.id, p.name)}
+                          className="btn-touch text-[11px] text-red-500 font-medium opacity-0 group-hover:opacity-100 hover:text-red-700 transition-all px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {players.length === 0 && (
+                    <p className="text-center text-muted text-sm py-6">No players added yet</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

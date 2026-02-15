@@ -127,12 +127,6 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 bg-background-secondary rounded-2xl p-4 text-center">
-          <p className="text-[11px] text-muted uppercase tracking-wider font-medium mb-2">Demo Credentials</p>
-          <p className="text-sm text-foreground-secondary">
-            <span className="font-semibold">admin</span> / <span className="font-semibold">Hendomf</span>
-          </p>
-        </div>
       </div>
     </div>
   );
