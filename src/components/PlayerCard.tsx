@@ -99,7 +99,7 @@ export default function PlayerCard({
           <div className="w-3/5 h-[1px] bg-gradient-to-r from-transparent via-[#D4B04A]/50 to-transparent mb-[2%]" />
 
           {/* Player name */}
-          <h3 className="fut-text-name font-black uppercase tracking-wider text-[#D4B04A] text-center leading-tight truncate max-w-full drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] mb-[2%]">
+          <h3 className="fut-text-name font-black uppercase tracking-wider text-[#D4B04A] text-center leading-tight truncate max-w-full drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] [text-shadow:0_0_8px_rgba(0,0,0,0.8),0_0_16px_rgba(0,0,0,0.5)] mb-[2%]">
             {name}
           </h3>
 
