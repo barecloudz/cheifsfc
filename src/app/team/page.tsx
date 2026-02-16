@@ -60,7 +60,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-2 md:px-4">
+      <div className="max-w-5xl mx-auto px-1 md:px-4">
         {/* Team Photo */}
         {settings?.teamPhotoUrl && (
           <div className="card-premium overflow-hidden mb-8 animate-fadeInUp">
@@ -84,10 +84,10 @@ export default function TeamPage() {
               <span className="w-2 h-2 rounded-full bg-gold" />
               <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">The Squad</h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-5 md:justify-items-center">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-1 md:gap-5 md:justify-items-center">
               {players.map((player) => (
+                <div key={player.id} className="w-full">
                 <PlayerCard
-                  key={player.id}
                   name={player.name}
                   position={player.position}
                   number={player.number}
@@ -99,6 +99,7 @@ export default function TeamPage() {
                   defending={player.defending}
                   physical={player.physical}
                 />
+                </div>
               ))}
             </div>
           </div>
