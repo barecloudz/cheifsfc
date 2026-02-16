@@ -22,6 +22,7 @@ interface Player {
 interface Settings {
   teamPhotoUrl: string | null;
   playerCardsOn: boolean;
+  cardTypes: string;
 }
 
 export default function TeamPage() {
@@ -86,23 +87,33 @@ export default function TeamPage() {
               <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">The Squad</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-1 md:gap-5 md:justify-items-center">
-              {players.map((player) => (
-                <div key={player.id} className="w-full">
-                <PlayerCard
-                  name={player.name}
-                  position={player.position}
-                  number={player.number}
-                  imageUrl={player.imageUrl}
-                  pace={player.pace}
-                  shooting={player.shooting}
-                  passing={player.passing}
-                  dribbling={player.dribbling}
-                  defending={player.defending}
-                  physical={player.physical}
-                  cardType={player.cardType}
-                />
-                </div>
-              ))}
+              {(() => {
+                const cardTypeImageMap: Record<string, string> = {};
+                try {
+                  const parsed = JSON.parse(settings?.cardTypes || "[]");
+                  for (const ct of parsed) {
+                    if (ct.value && ct.imageUrl) cardTypeImageMap[ct.value] = ct.imageUrl;
+                  }
+                } catch { /* ignore */ }
+                return players.map((player) => (
+                  <div key={player.id} className="w-full">
+                  <PlayerCard
+                    name={player.name}
+                    position={player.position}
+                    number={player.number}
+                    imageUrl={player.imageUrl}
+                    pace={player.pace}
+                    shooting={player.shooting}
+                    passing={player.passing}
+                    dribbling={player.dribbling}
+                    defending={player.defending}
+                    physical={player.physical}
+                    cardType={player.cardType}
+                    cardImageUrl={cardTypeImageMap[player.cardType]}
+                  />
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         )}

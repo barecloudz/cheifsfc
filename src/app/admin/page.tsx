@@ -123,6 +123,8 @@ export default function AdminDashboard() {
   const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]" });
   const [newCardTypeValue, setNewCardTypeValue] = useState("");
   const [newCardTypeLabel, setNewCardTypeLabel] = useState("");
+  const [newCardTypeImageUrl, setNewCardTypeImageUrl] = useState("");
+  const [uploadingCardTypeImage, setUploadingCardTypeImage] = useState(false);
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -480,20 +482,38 @@ export default function AdminDashboard() {
   }
 
   const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
-  const customCardTypes: { value: string; label: string }[] = (() => {
+  const customCardTypes: { value: string; label: string; imageUrl?: string }[] = (() => {
     try { return JSON.parse(siteSettings.cardTypes); } catch { return []; }
   })();
   const cardTypes = [{ value: "default", label: "Default" }, ...customCardTypes];
 
+  async function handleCardTypeImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCardTypeImage(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      if (url) {
+        setNewCardTypeImageUrl(url);
+      } else {
+        showToast("Upload failed");
+      }
+    } catch {
+      showToast("Upload failed");
+    }
+    setUploadingCardTypeImage(false);
+    e.target.value = "";
+  }
+
   async function addCardType() {
     const val = newCardTypeValue.trim().toLowerCase().replace(/\s+/g, "-");
     const lbl = newCardTypeLabel.trim();
-    if (!val || !lbl) return;
+    if (!val || !lbl || !newCardTypeImageUrl) return;
     if (cardTypes.some((ct) => ct.value === val)) {
       showToast("Card type already exists");
       return;
     }
-    const updated = [...customCardTypes, { value: val, label: lbl }];
+    const updated = [...customCardTypes, { value: val, label: lbl, imageUrl: newCardTypeImageUrl }];
     const json = JSON.stringify(updated);
     await fetch("/api/settings", {
       method: "PATCH",
@@ -503,6 +523,7 @@ export default function AdminDashboard() {
     setSiteSettings((s) => ({ ...s, cardTypes: json }));
     setNewCardTypeValue("");
     setNewCardTypeLabel("");
+    setNewCardTypeImageUrl("");
     showToast("Card type added");
   }
 
@@ -1274,9 +1295,23 @@ export default function AdminDashboard() {
                 <div className="space-y-1.5 mb-4">
                   {cardTypes.map((ct) => (
                     <div key={ct.value} className="flex items-center justify-between py-2 px-3 rounded-xl bg-background-secondary">
-                      <div>
-                        <span className="text-sm font-medium text-foreground">{ct.label}</span>
-                        <span className="text-[10px] text-muted ml-2">{ct.value}</span>
+                      <div className="flex items-center gap-2.5">
+                        {"imageUrl" in ct && ct.imageUrl ? (
+                          <div className="w-8 h-11 relative shrink-0">
+                            <Image src={ct.imageUrl} alt={ct.label} fill className="object-contain" sizes="32px" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-11 rounded bg-card-border/30 flex items-center justify-center shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="3" width="20" height="14" rx="2" />
+                              <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-sm font-medium text-foreground">{ct.label}</span>
+                          <span className="text-[10px] text-muted ml-2">{ct.value}</span>
+                        </div>
                       </div>
                       {ct.value !== "default" && (
                         <button
@@ -1290,29 +1325,53 @@ export default function AdminDashboard() {
                   ))}
                 </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Value (e.g. gold)"
-                    value={newCardTypeValue}
-                    onChange={(e) => setNewCardTypeValue(e.target.value)}
-                    className={selectClass + " flex-1"}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Label (e.g. Gold)"
-                    value={newCardTypeLabel}
-                    onChange={(e) => setNewCardTypeLabel(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addCardType(); }}
-                    className={selectClass + " flex-1"}
-                  />
-                  <button
-                    onClick={addCardType}
-                    disabled={!newCardTypeValue.trim() || !newCardTypeLabel.trim()}
-                    className="btn-touch bg-maroon text-white text-sm font-semibold px-5 rounded-xl active:scale-95 disabled:opacity-40"
-                  >
-                    Add
-                  </button>
+                <div className="bg-background rounded-xl p-3 space-y-2">
+                  <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Add New Card Type</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Value (e.g. gold)"
+                      value={newCardTypeValue}
+                      onChange={(e) => setNewCardTypeValue(e.target.value)}
+                      className={selectClass + " flex-1"}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Label (e.g. Gold)"
+                      value={newCardTypeLabel}
+                      onChange={(e) => setNewCardTypeLabel(e.target.value)}
+                      className={selectClass + " flex-1"}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {newCardTypeImageUrl ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="w-8 h-11 relative shrink-0">
+                          <Image src={newCardTypeImageUrl} alt="Preview" fill className="object-contain" sizes="32px" />
+                        </div>
+                        <button
+                          onClick={() => setNewCardTypeImageUrl("")}
+                          className="text-[10px] text-red-500 font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex-1">
+                        <span className={selectClass + " block text-center cursor-pointer text-muted text-xs"}>
+                          {uploadingCardTypeImage ? "Uploading..." : "Upload Card Frame PNG"}
+                        </span>
+                        <input type="file" accept="image/png" className="hidden" onChange={handleCardTypeImageUpload} disabled={uploadingCardTypeImage} />
+                      </label>
+                    )}
+                    <button
+                      onClick={addCardType}
+                      disabled={!newCardTypeValue.trim() || !newCardTypeLabel.trim() || !newCardTypeImageUrl}
+                      className="btn-touch bg-maroon text-white text-sm font-semibold px-5 py-2.5 rounded-xl active:scale-95 disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

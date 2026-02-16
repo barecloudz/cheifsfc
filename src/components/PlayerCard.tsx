@@ -14,6 +14,7 @@ interface PlayerCardProps {
   defending: number;
   physical: number;
   cardType?: string;
+  cardImageUrl?: string;
 }
 
 export default function PlayerCard({
@@ -27,9 +28,10 @@ export default function PlayerCard({
   defending,
   physical,
   cardType = "default",
+  cardImageUrl,
 }: PlayerCardProps) {
   const rating = Math.round((pace + shooting + passing + dribbling + defending + physical) / 6);
-  const cardImage = cardType === "default" ? "/futcard.png" : `/futcard-${cardType}.png`;
+  const cardImage = cardImageUrl || (cardType === "default" ? "/futcard.png" : `/futcard-${cardType}.png`);
 
   const leftStats = [
     { label: "PAC", value: pace },
