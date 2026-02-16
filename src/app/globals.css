@@ -179,7 +179,7 @@ input:focus, select:focus {
 .fut-card {
   position: relative;
   width: 100%;
-  max-width: 200px;
+  max-width: 240px;
   aspect-ratio: 0.765;
   filter: drop-shadow(0 0 12px rgba(180, 30, 50, 0.45)) drop-shadow(0 2px 8px rgba(0,0,0,0.3));
   transition: transform 0.25s ease, filter 0.25s ease;
