@@ -10,7 +10,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { name, position, number, imageUrl, pace, shooting, passing, dribbling, defending, physical } = body;
+  const { name, position, number, imageUrl, pace, shooting, passing, dribbling, defending, physical, cardType } = body;
 
   if (!name || !position) {
     return NextResponse.json({ error: "Name and position are required" }, { status: 400 });
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       dribbling: dribbling ?? 50,
       defending: defending ?? 50,
       physical: physical ?? 50,
+      cardType: cardType ?? "default",
     },
   });
 

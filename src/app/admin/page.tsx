@@ -62,6 +62,7 @@ interface PlayerData {
   dribbling: number;
   defending: number;
   physical: number;
+  cardType: string;
 }
 
 interface SiteSettingsData {
@@ -127,6 +128,7 @@ export default function AdminDashboard() {
   const [playerForm, setPlayerForm] = useState({
     name: "", position: "CM", number: "", imageUrl: "",
     pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
+    cardType: "default",
   });
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
@@ -402,6 +404,7 @@ export default function AdminDashboard() {
     setPlayerForm({
       name: "", position: "CM", number: "", imageUrl: "",
       pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
+      cardType: "default",
     });
     setShowAddPlayer(false);
     setEditingPlayerId(null);
@@ -421,6 +424,7 @@ export default function AdminDashboard() {
       dribbling: playerForm.dribbling,
       defending: playerForm.defending,
       physical: playerForm.physical,
+      cardType: playerForm.cardType,
     };
 
     if (editingPlayerId) {
@@ -455,6 +459,7 @@ export default function AdminDashboard() {
       dribbling: p.dribbling,
       defending: p.defending,
       physical: p.physical,
+      cardType: p.cardType || "default",
     });
     setEditingPlayerId(p.id);
     setShowAddPlayer(true);
@@ -472,6 +477,9 @@ export default function AdminDashboard() {
   }
 
   const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
+  const cardTypes = [
+    { value: "default", label: "Default" },
+  ];
 
   if (!authenticated) {
     return (
@@ -1303,6 +1311,19 @@ export default function AdminDashboard() {
                             </label>
                           )}
                         </div>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Card Type</label>
+                        <select
+                          value={playerForm.cardType}
+                          onChange={(e) => setPlayerForm((f) => ({ ...f, cardType: e.target.value }))}
+                          className={selectClass}
+                        >
+                          {cardTypes.map((ct) => (
+                            <option key={ct.value} value={ct.value}>{ct.label}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Stats sliders */}

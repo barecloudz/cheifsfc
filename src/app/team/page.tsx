@@ -16,6 +16,7 @@ interface Player {
   dribbling: number;
   defending: number;
   physical: number;
+  cardType: string;
 }
 
 interface Settings {
@@ -98,6 +99,7 @@ export default function TeamPage() {
                   dribbling={player.dribbling}
                   defending={player.defending}
                   physical={player.physical}
+                  cardType={player.cardType}
                 />
                 </div>
               ))}

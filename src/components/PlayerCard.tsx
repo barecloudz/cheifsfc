@@ -13,6 +13,7 @@ interface PlayerCardProps {
   dribbling: number;
   defending: number;
   physical: number;
+  cardType?: string;
 }
 
 export default function PlayerCard({
@@ -25,8 +26,10 @@ export default function PlayerCard({
   dribbling,
   defending,
   physical,
+  cardType = "default",
 }: PlayerCardProps) {
   const rating = Math.round((pace + shooting + passing + dribbling + defending + physical) / 6);
+  const cardImage = cardType === "default" ? "/futcard.png" : `/futcard-${cardType}.png`;
 
   const leftStats = [
     { label: "PAC", value: pace },
@@ -43,7 +46,7 @@ export default function PlayerCard({
     <div className="fut-card">
       {/* Card frame PNG */}
       <Image
-        src="/futcard.png"
+        src={cardImage}
         alt=""
         fill
         className="object-contain pointer-events-none select-none"

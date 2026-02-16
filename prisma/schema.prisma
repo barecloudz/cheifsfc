@@ -52,6 +52,7 @@ model Player {
   dribbling Int      @default(50)
   defending Int      @default(50)
   physical  Int      @default(50)
+  cardType  String   @default("default")
   createdAt DateTime @default(now())
 }
 
