@@ -72,19 +72,19 @@ export default function PlayerCard({
           />
         </div>
 
-        {/* Player image - centered circle */}
-        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[45%] aspect-square rounded-full overflow-hidden border-2 border-[#D4B04A]/30">
+        {/* Player image - transparent cutout */}
+        <div className="absolute top-[4%] left-[20%] right-[4%] bottom-[46%] overflow-hidden">
           {imageUrl ? (
             <Image
               src={imageUrl}
               alt={name}
-              width={90}
-              height={90}
-              className="w-full h-full object-cover"
+              fill
+              className="object-contain object-bottom"
+              sizes="200px"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-black/20">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.25}>
+            <div className="w-full h-full flex items-center justify-center">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D4B04A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={0.2}>
                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
