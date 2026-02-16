@@ -8,24 +8,34 @@ cloudinary.config({
 });
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
+  try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return NextResponse.json({ error: "Cloudinary not configured. Check env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET" }, { status: 500 });
+    }
 
-  if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream({ folder: "chiefs-fc" }, (error, result) => {
+          if (error || !result) reject(error || new Error("Upload failed"));
+          else resolve(result);
+        })
+        .end(buffer);
+    });
+
+    return NextResponse.json({ url: result.secure_url });
+  } catch (err) {
+    console.error("Upload error:", err);
+    const message = err instanceof Error ? err.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream({ folder: "chiefs-fc" }, (error, result) => {
-        if (error || !result) reject(error || new Error("Upload failed"));
-        else resolve(result);
-      })
-      .end(buffer);
-  });
-
-  return NextResponse.json({ url: result.secure_url });
 }
