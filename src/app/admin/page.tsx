@@ -323,28 +323,38 @@ export default function AdminDashboard() {
     loadData();
   }
 
+  async function uploadToCloudinary(file: File): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "chiefs-unsigned");
+    const res = await fetch("https://api.cloudinary.com/v1_1/djqdjdwma/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.secure_url || null;
+  }
+
   async function handleTeamPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingTeamPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || "Upload failed");
-      } else if (data.url) {
+      const url = await uploadToCloudinary(file);
+      if (url) {
         await fetch("/api/settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ teamPhotoUrl: data.url }),
+          body: JSON.stringify({ teamPhotoUrl: url }),
         });
-        setSiteSettings((s) => ({ ...s, teamPhotoUrl: data.url }));
+        setSiteSettings((s) => ({ ...s, teamPhotoUrl: url }));
         showToast("Team photo uploaded");
+      } else {
+        showToast("Upload failed");
       }
     } catch {
-      showToast("Upload failed — check Cloudinary config");
+      showToast("Upload failed");
     }
     setUploadingTeamPhoto(false);
     e.target.value = "";
@@ -375,17 +385,14 @@ export default function AdminDashboard() {
     if (!file) return;
     setUploadingPlayerPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || "Upload failed");
-      } else if (data.url) {
-        setPlayerForm((f) => ({ ...f, imageUrl: data.url }));
+      const url = await uploadToCloudinary(file);
+      if (url) {
+        setPlayerForm((f) => ({ ...f, imageUrl: url }));
+      } else {
+        showToast("Upload failed");
       }
     } catch {
-      showToast("Upload failed — check Cloudinary config");
+      showToast("Upload failed");
     }
     setUploadingPlayerPhoto(false);
     e.target.value = "";
