@@ -56,7 +56,7 @@ export default function PlayerCard({
       <div className="fut-card-content">
 
         {/* Rating + Position + Logo - top left inside frame */}
-        <div className="absolute top-[24%] left-[19%] flex flex-col items-center z-10">
+        <div className="absolute top-[21%] left-[19%] flex flex-col items-center z-10">
           <span className="fut-text-lg font-black leading-none text-[#D4B04A] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             {rating}
           </span>
