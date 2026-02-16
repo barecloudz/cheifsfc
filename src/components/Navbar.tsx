@@ -14,8 +14,9 @@ const links = [
 export default function Navbar() {
   const pathname = usePathname();
 
-  // Hide on admin/login pages — those have their own headers
+  // Hide on admin/login/player pages — those have their own headers
   if (pathname.startsWith("/admin")) return null;
+  if (pathname.startsWith("/player")) return null;
   // Hide on subpages that use PageHeader
   if (pathname.startsWith("/matches/")) return null;
 
@@ -56,7 +57,7 @@ export default function Navbar() {
 
           {/* Login button */}
           <Link
-            href="/admin/login"
+            href="/player/login"
             className="btn-touch flex items-center gap-1.5 bg-maroon text-white text-xs font-semibold px-4 py-2 rounded-full active:scale-95"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

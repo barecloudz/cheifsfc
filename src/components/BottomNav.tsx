@@ -52,12 +52,22 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    href: "/player",
+    label: "My Card",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "var(--maroon)" : "none"} stroke={active ? "var(--maroon)" : "var(--gray)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    ),
+  },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/admin")) return null;
+  if (pathname.startsWith("/admin") || pathname === "/player/login") return null;
 
   function handleNavClick() {
     window.scrollTo({ top: 0, behavior: "instant" });

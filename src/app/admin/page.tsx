@@ -69,9 +69,29 @@ interface SiteSettingsData {
   teamPhotoUrl: string | null;
   playerCardsOn: boolean;
   cardTypes: string;
+  pointsPerTraining: number;
+  upgradeCost: number;
 }
 
-type Tab = "dashboard" | "schedule" | "add" | "table" | "team";
+interface PointsPlayerData {
+  id: number;
+  name: string;
+  pointBalance: number;
+  pointsEarned: number;
+  pointsSpent: number;
+  pointTransactions: { id: number; amount: number; type: string; description: string; createdAt: string }[];
+}
+
+interface TrainingData {
+  id: number;
+  date: string;
+  location: string;
+  notes: string | null;
+  completed: boolean;
+  rsvps: { id: number; playerId: number; player: { id: number; name: string }; status: string; attended: boolean }[];
+}
+
+type Tab = "dashboard" | "schedule" | "add" | "table" | "team" | "points";
 
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
@@ -120,10 +140,28 @@ export default function AdminDashboard() {
 
   // Team management state
   const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]" });
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]", pointsPerTraining: 10, upgradeCost: 10 });
+
+  // Points tab state
+  const [pointsPlayers, setPointsPlayers] = useState<PointsPlayerData[]>([]);
+  const [trainings, setTrainings] = useState<TrainingData[]>([]);
+  const [awardPlayerId, setAwardPlayerId] = useState("");
+  const [awardAmount, setAwardAmount] = useState("");
+  const [awardDescription, setAwardDescription] = useState("");
+  const [awardingPoints, setAwardingPoints] = useState(false);
+  const [expandedPointsPlayer, setExpandedPointsPlayer] = useState<number | null>(null);
+  const [trainingDate, setTrainingDate] = useState("");
+  const [trainingTime, setTrainingTime] = useState("");
+  const [trainingLocation, setTrainingLocation] = useState("");
+  const [trainingNotes, setTrainingNotes] = useState("");
+  const [addingTraining, setAddingTraining] = useState(false);
+  const [expandedTraining, setExpandedTraining] = useState<number | null>(null);
+  const [trainingAttendees, setTrainingAttendees] = useState<Record<number, number[]>>({});
+  const [confirmingTraining, setConfirmingTraining] = useState<number | null>(null);
   const [newCardTypeValue, setNewCardTypeValue] = useState("");
   const [newCardTypeLabel, setNewCardTypeLabel] = useState("");
   const [newCardTypeImageUrl, setNewCardTypeImageUrl] = useState("");
+  const [newCardTypeUnlockCost, setNewCardTypeUnlockCost] = useState("");
   const [uploadingCardTypeImage, setUploadingCardTypeImage] = useState(false);
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
@@ -133,7 +171,7 @@ export default function AdminDashboard() {
   const [playerForm, setPlayerForm] = useState({
     name: "", position: "CM", number: "", imageUrl: "",
     pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
-    cardType: "default",
+    cardType: "default", pin: "",
   });
 
   const showToast = useCallback((msg: string) => setToast(msg), []);
@@ -158,6 +196,20 @@ export default function AdminDashboard() {
     });
     fetch("/api/players").then((r) => r.json()).then(setPlayers);
     fetch("/api/settings").then((r) => r.json()).then(setSiteSettings);
+    fetch("/api/admin/points").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setPointsPlayers(data); });
+    fetch("/api/training").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) {
+        setTrainings(data);
+        // Pre-populate attendee checkboxes with RSVP "in" players
+        const attendees: Record<number, number[]> = {};
+        data.forEach((t: TrainingData) => {
+          if (!t.completed) {
+            attendees[t.id] = t.rsvps.filter((r) => r.status === "in").map((r) => r.playerId);
+          }
+        });
+        setTrainingAttendees(attendees);
+      }
+    });
   }
 
   async function submitScore(matchId: number) {
@@ -409,7 +461,7 @@ export default function AdminDashboard() {
     setPlayerForm({
       name: "", position: "CM", number: "", imageUrl: "",
       pace: 50, shooting: 50, passing: 50, dribbling: 50, defending: 50, physical: 50,
-      cardType: "default",
+      cardType: "default", pin: "",
     });
     setShowAddPlayer(false);
     setEditingPlayerId(null);
@@ -418,7 +470,7 @@ export default function AdminDashboard() {
   async function savePlayer() {
     if (!playerForm.name.trim() || !playerForm.position) return;
     setAddingPlayer(true);
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: playerForm.name.trim(),
       position: playerForm.position,
       number: playerForm.number ? parseInt(playerForm.number) : null,
@@ -438,13 +490,30 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editingPlayerId, ...payload }),
       });
+      // Update PIN separately if changed
+      if (playerForm.pin) {
+        await fetch("/api/admin/pins", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: editingPlayerId, pin: playerForm.pin }),
+        });
+      }
       showToast("Player updated");
     } else {
-      await fetch("/api/players", {
+      const res = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      // Set PIN for newly created player
+      if (res.ok && playerForm.pin) {
+        const newPlayer = await res.json();
+        await fetch("/api/admin/pins", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId: newPlayer.id, pin: playerForm.pin }),
+        });
+      }
       showToast("Player added");
     }
     setAddingPlayer(false);
@@ -465,6 +534,7 @@ export default function AdminDashboard() {
       defending: p.defending,
       physical: p.physical,
       cardType: p.cardType || "default",
+      pin: "",
     });
     setEditingPlayerId(p.id);
     setShowAddPlayer(true);
@@ -482,7 +552,7 @@ export default function AdminDashboard() {
   }
 
   const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
-  const customCardTypes: { value: string; label: string; imageUrl?: string }[] = (() => {
+  const customCardTypes: { value: string; label: string; imageUrl?: string; unlockCost?: number }[] = (() => {
     try { return JSON.parse(siteSettings.cardTypes); } catch { return []; }
   })();
   const cardTypes = [{ value: "default", label: "Default" }, ...customCardTypes];
@@ -513,7 +583,8 @@ export default function AdminDashboard() {
       showToast("Card type already exists");
       return;
     }
-    const updated = [...customCardTypes, { value: val, label: lbl, imageUrl: newCardTypeImageUrl }];
+    const unlockCost = parseInt(newCardTypeUnlockCost) || 0;
+    const updated = [...customCardTypes, { value: val, label: lbl, imageUrl: newCardTypeImageUrl, unlockCost }];
     const json = JSON.stringify(updated);
     await fetch("/api/settings", {
       method: "PATCH",
@@ -524,6 +595,7 @@ export default function AdminDashboard() {
     setNewCardTypeValue("");
     setNewCardTypeLabel("");
     setNewCardTypeImageUrl("");
+    setNewCardTypeUnlockCost("");
     showToast("Card type added");
   }
 
@@ -559,6 +631,7 @@ export default function AdminDashboard() {
     add: "Add New Match",
     table: "Manage Table",
     team: "Manage Team",
+    points: "Points Manager",
   };
 
   const menuItems: { id: Tab; label: string; iconSvg: React.ReactNode }[] = [
@@ -620,6 +693,15 @@ export default function AdminDashboard() {
           <circle cx="9" cy="7" r="4" />
           <path d="M23 21v-2a4 4 0 00-3-3.87" />
           <path d="M16 3.13a4 4 0 010 7.75" />
+        </svg>
+      ),
+    },
+    {
+      id: "points",
+      label: "Points Manager",
+      iconSvg: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ),
     },
@@ -1277,6 +1359,62 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Points Economy Settings */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-gold/40" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-foreground">Points Economy</h2>
+                    <p className="text-[11px] text-muted">Configure training rewards & upgrade costs</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Points per Training</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={siteSettings.pointsPerTraining}
+                      onChange={async (e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setSiteSettings((s) => ({ ...s, pointsPerTraining: val }));
+                        await fetch("/api/settings", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ pointsPerTraining: val }),
+                        });
+                      }}
+                      className={selectClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Upgrade Cost (per +1)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={siteSettings.upgradeCost}
+                      onChange={async (e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setSiteSettings((s) => ({ ...s, upgradeCost: val }));
+                        await fetch("/api/settings", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ upgradeCost: val }),
+                        });
+                      }}
+                      className={selectClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Card Types Management */}
             <div className="card-premium overflow-hidden">
               <div className="h-1 bg-background-secondary" />
@@ -1311,6 +1449,9 @@ export default function AdminDashboard() {
                         <div>
                           <span className="text-sm font-medium text-foreground">{ct.label}</span>
                           <span className="text-[10px] text-muted ml-2">{ct.value}</span>
+                          {"unlockCost" in ct && (ct as { unlockCost?: number }).unlockCost ? (
+                            <span className="text-[10px] text-gold-dark ml-2">{(ct as { unlockCost: number }).unlockCost} pts</span>
+                          ) : null}
                         </div>
                       </div>
                       {ct.value !== "default" && (
@@ -1341,6 +1482,14 @@ export default function AdminDashboard() {
                       value={newCardTypeLabel}
                       onChange={(e) => setNewCardTypeLabel(e.target.value)}
                       className={selectClass + " flex-1"}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Unlock cost"
+                      value={newCardTypeUnlockCost}
+                      onChange={(e) => setNewCardTypeUnlockCost(e.target.value)}
+                      className={selectClass + " w-24"}
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -1470,17 +1619,31 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div>
-                        <label className={labelClass}>Card Type</label>
-                        <select
-                          value={playerForm.cardType}
-                          onChange={(e) => setPlayerForm((f) => ({ ...f, cardType: e.target.value }))}
-                          className={selectClass}
-                        >
-                          {cardTypes.map((ct) => (
-                            <option key={ct.value} value={ct.value}>{ct.label}</option>
-                          ))}
-                        </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelClass}>Card Type</label>
+                          <select
+                            value={playerForm.cardType}
+                            onChange={(e) => setPlayerForm((f) => ({ ...f, cardType: e.target.value }))}
+                            className={selectClass}
+                          >
+                            {cardTypes.map((ct) => (
+                              <option key={ct.value} value={ct.value}>{ct.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelClass}>Login PIN</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={playerForm.pin}
+                            onChange={(e) => setPlayerForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                            placeholder={editingPlayerId ? "Leave blank to keep" : "4 digits"}
+                            className={selectClass}
+                          />
+                        </div>
                       </div>
 
                       {/* Stats sliders */}
@@ -1562,6 +1725,318 @@ export default function AdminDashboard() {
                   ))}
                   {players.length === 0 && (
                     <p className="text-center text-muted text-sm py-6">No players added yet</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* POINTS MANAGER */}
+        {tab === "points" && (
+          <div className="space-y-4 animate-fadeInUp">
+            {/* Schedule Training */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-maroon-gradient" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Schedule Training</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div>
+                    <label className={labelClass}>Date</label>
+                    <input type="date" value={trainingDate} onChange={(e) => setTrainingDate(e.target.value)} className={selectClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Time</label>
+                    <input type="time" value={trainingTime} onChange={(e) => setTrainingTime(e.target.value)} className={selectClass} />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className={labelClass}>Location</label>
+                  <input type="text" value={trainingLocation} onChange={(e) => setTrainingLocation(e.target.value)} placeholder="e.g. Main Field" className={selectClass} />
+                </div>
+                <div className="mb-3">
+                  <label className={labelClass}>Notes (optional)</label>
+                  <input type="text" value={trainingNotes} onChange={(e) => setTrainingNotes(e.target.value)} placeholder="Bring shin guards..." className={selectClass} />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!trainingDate || !trainingTime || !trainingLocation.trim()) return;
+                    setAddingTraining(true);
+                    await fetch("/api/training", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ date: new Date(`${trainingDate}T${trainingTime}:00`).toISOString(), location: trainingLocation.trim(), notes: trainingNotes.trim() || null }),
+                    });
+                    setTrainingDate(""); setTrainingTime(""); setTrainingLocation(""); setTrainingNotes("");
+                    setAddingTraining(false);
+                    showToast("Training scheduled");
+                    loadData();
+                  }}
+                  disabled={addingTraining || !trainingDate || !trainingTime || !trainingLocation.trim()}
+                  className="btn-touch w-full bg-maroon-gradient text-white text-sm font-semibold py-3 rounded-xl active:scale-[0.98] disabled:opacity-40 shadow-sm shadow-maroon/15"
+                >
+                  {addingTraining ? "Scheduling..." : "Schedule Training"}
+                </button>
+              </div>
+            </div>
+
+            {/* Upcoming Training Sessions */}
+            {trainings.filter((t) => !t.completed).length > 0 && (
+              <div className="card-premium overflow-hidden">
+                <div className="h-1 bg-gold/40" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Upcoming Training</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {trainings.filter((t) => !t.completed).map((t) => {
+                      const inCount = t.rsvps.filter((r) => r.status === "in").length;
+                      const outCount = t.rsvps.filter((r) => r.status === "out").length;
+                      const isExpanded = expandedTraining === t.id;
+                      return (
+                        <div key={t.id} className="bg-background rounded-xl overflow-hidden">
+                          <button
+                            onClick={() => setExpandedTraining(isExpanded ? null : t.id)}
+                            className="w-full flex items-center justify-between p-3 text-left"
+                          >
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{t.location}</p>
+                              <p className="text-[11px] text-muted">
+                                {new Date(t.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" })}
+                                {" · "}
+                                {new Date(t.date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{inCount} in</span>
+                              <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{outCount} out</span>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t border-card-border">
+                              {t.notes && <p className="text-[11px] text-muted italic py-2">{t.notes}</p>}
+                              <p className="text-[10px] text-muted uppercase tracking-wider font-medium mt-2 mb-1.5">Mark Attendance</p>
+                              <div className="space-y-1 mb-3">
+                                {players.map((p) => {
+                                  const checked = (trainingAttendees[t.id] || []).includes(p.id);
+                                  const rsvp = t.rsvps.find((r) => r.playerId === p.id);
+                                  return (
+                                    <label key={p.id} className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-white transition-colors cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(e) => {
+                                          setTrainingAttendees((prev) => {
+                                            const current = prev[t.id] || [];
+                                            return { ...prev, [t.id]: e.target.checked ? [...current, p.id] : current.filter((id) => id !== p.id) };
+                                          });
+                                        }}
+                                        className="w-4 h-4 rounded accent-maroon"
+                                      />
+                                      <span className="text-sm text-foreground">{p.name}</span>
+                                      {rsvp && (
+                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${rsvp.status === "in" ? "bg-emerald-50 text-emerald-600" : rsvp.status === "out" ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-500"}`}>
+                                          {rsvp.status}
+                                        </span>
+                                      )}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={async () => {
+                                    setConfirmingTraining(t.id);
+                                    await fetch("/api/training/confirm", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ trainingId: t.id, attendedPlayerIds: trainingAttendees[t.id] || [] }),
+                                    });
+                                    setConfirmingTraining(null);
+                                    showToast(`Training confirmed! ${(trainingAttendees[t.id] || []).length} players awarded points`);
+                                    loadData();
+                                  }}
+                                  disabled={confirmingTraining === t.id}
+                                  className="btn-touch flex-1 bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-50"
+                                >
+                                  {confirmingTraining === t.id ? "Confirming..." : `Confirm Attendance (${(trainingAttendees[t.id] || []).length})`}
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm("Delete this training session?")) return;
+                                    await fetch("/api/training", {
+                                      method: "DELETE",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ id: t.id }),
+                                    });
+                                    showToast("Training deleted");
+                                    loadData();
+                                  }}
+                                  className="btn-touch w-11 bg-red-50 text-red-500 rounded-xl flex items-center justify-center active:bg-red-100"
+                                >
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Completed Training */}
+            {trainings.filter((t) => t.completed).length > 0 && (
+              <div className="card-premium overflow-hidden">
+                <div className="h-1 bg-background-secondary" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <span className="w-2 h-2 rounded-full bg-muted" />
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Completed Training</h3>
+                  </div>
+                  <div className="space-y-1">
+                    {trainings.filter((t) => t.completed).map((t) => (
+                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{t.location}</p>
+                          <p className="text-[11px] text-muted">
+                            {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })}
+                            {" · "}
+                            {t.rsvps.filter((r) => r.attended).length} attended
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Done</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Individual Award */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-gold/40" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Award Points</h2>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className={labelClass}>Player</label>
+                    <select value={awardPlayerId} onChange={(e) => setAwardPlayerId(e.target.value)} className={selectClass}>
+                      <option value="">Select player...</option>
+                      {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelClass}>Amount</label>
+                      <input type="number" min="1" value={awardAmount} onChange={(e) => setAwardAmount(e.target.value)} placeholder="10" className={selectClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Description</label>
+                      <input type="text" value={awardDescription} onChange={(e) => setAwardDescription(e.target.value)} placeholder="Man of the match" className={selectClass} />
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!awardPlayerId || !awardAmount || !awardDescription.trim()) return;
+                      setAwardingPoints(true);
+                      await fetch("/api/admin/points", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ playerIds: [parseInt(awardPlayerId)], amount: parseInt(awardAmount), description: awardDescription.trim() }),
+                      });
+                      setAwardPlayerId(""); setAwardAmount(""); setAwardDescription("");
+                      setAwardingPoints(false);
+                      showToast("Points awarded");
+                      loadData();
+                    }}
+                    disabled={awardingPoints || !awardPlayerId || !awardAmount || !awardDescription.trim()}
+                    className="btn-touch w-full bg-maroon-gradient text-white text-sm font-semibold py-3 rounded-xl active:scale-[0.98] disabled:opacity-40 shadow-sm shadow-maroon/15"
+                  >
+                    {awardingPoints ? "Awarding..." : "Award Points"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Point Balances */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-background-secondary" />
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Point Balances</h2>
+                </div>
+                <div className="space-y-0.5">
+                  {pointsPlayers.map((p) => (
+                    <div key={p.id}>
+                      <button
+                        onClick={() => setExpandedPointsPlayer(expandedPointsPlayer === p.id ? null : p.id)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-background-secondary transition-colors"
+                      >
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">{p.name}</p>
+                          <p className="text-[10px] text-muted">{p.pointsEarned} earned · {p.pointsSpent} spent</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gold-dark">{p.pointBalance} pts</span>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" className={`transition-transform ${expandedPointsPlayer === p.id ? "rotate-180" : ""}`}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </div>
+                      </button>
+                      {expandedPointsPlayer === p.id && p.pointTransactions.length > 0 && (
+                        <div className="px-3 pb-2">
+                          <div className="bg-background rounded-lg p-2 space-y-1">
+                            {p.pointTransactions.map((tx) => (
+                              <div key={tx.id} className="flex items-center justify-between py-1 px-2">
+                                <div>
+                                  <p className="text-[11px] text-foreground">{tx.description}</p>
+                                  <p className="text-[9px] text-muted">{new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })}</p>
+                                </div>
+                                <span className={`text-xs font-bold ${tx.amount > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                  {tx.amount > 0 ? "+" : ""}{tx.amount}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {pointsPlayers.length === 0 && (
+                    <p className="text-center text-muted text-sm py-6">No players yet</p>
                   )}
                 </div>
               </div>

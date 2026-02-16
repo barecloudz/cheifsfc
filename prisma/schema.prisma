@@ -41,24 +41,66 @@ model Match {
 }
 
 model Player {
-  id        Int      @id @default(autoincrement())
-  name      String
-  position  String
-  number    Int?
-  imageUrl  String?
-  pace      Int      @default(50)
-  shooting  Int      @default(50)
-  passing   Int      @default(50)
-  dribbling Int      @default(50)
-  defending Int      @default(50)
-  physical  Int      @default(50)
-  cardType  String   @default("default")
-  createdAt DateTime @default(now())
+  id                Int                @id @default(autoincrement())
+  name              String
+  position          String
+  number            Int?
+  imageUrl          String?
+  pace              Int                @default(50)
+  shooting          Int                @default(50)
+  passing           Int                @default(50)
+  dribbling         Int                @default(50)
+  defending         Int                @default(50)
+  physical          Int                @default(50)
+  cardType          String             @default("default")
+  pin               String?
+  pointBalance      Int                @default(0)
+  pointsEarned      Int                @default(0)
+  pointsSpent       Int                @default(0)
+  unlockedCardTypes String             @default("[]")
+  createdAt         DateTime           @default(now())
+  rsvps             TrainingRsvp[]
+  pointTransactions PointTransaction[]
+}
+
+model PointTransaction {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  amount      Int
+  type        String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model Training {
+  id        Int              @id @default(autoincrement())
+  date      DateTime
+  location  String
+  notes     String?
+  completed Boolean          @default(false)
+  rsvps     TrainingRsvp[]
+  createdAt DateTime         @default(now())
+}
+
+model TrainingRsvp {
+  id         Int      @id @default(autoincrement())
+  trainingId Int
+  training   Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  playerId   Int
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  status     String   @default("none")
+  attended   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([trainingId, playerId])
 }
 
 model SiteSettings {
-  id            Int      @id @default(1)
-  teamPhotoUrl  String?
-  playerCardsOn Boolean  @default(false)
-  cardTypes     String   @default("[]")
+  id                Int      @id @default(1)
+  teamPhotoUrl      String?
+  playerCardsOn     Boolean  @default(false)
+  cardTypes         String   @default("[]")
+  pointsPerTraining Int      @default(10)
+  upgradeCost       Int      @default(10)
 }

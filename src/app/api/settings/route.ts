@@ -11,12 +11,14 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { teamPhotoUrl, playerCardsOn, cardTypes } = body;
+  const { teamPhotoUrl, playerCardsOn, cardTypes, pointsPerTraining, upgradeCost } = body;
 
   const data: Record<string, unknown> = {};
   if (teamPhotoUrl !== undefined) data.teamPhotoUrl = teamPhotoUrl;
   if (playerCardsOn !== undefined) data.playerCardsOn = playerCardsOn;
   if (cardTypes !== undefined) data.cardTypes = cardTypes;
+  if (pointsPerTraining !== undefined) data.pointsPerTraining = pointsPerTraining;
+  if (upgradeCost !== undefined) data.upgradeCost = upgradeCost;
 
   const settings = await prisma.siteSettings.upsert({
     where: { id: 1 },
