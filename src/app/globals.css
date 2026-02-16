@@ -178,7 +178,8 @@ input:focus, select:focus {
 /* FIFA FUT-style player card — PNG background */
 .fut-card {
   position: relative;
-  width: 200px;
+  width: 100%;
+  max-width: 220px;
   aspect-ratio: 0.72;
   filter: drop-shadow(0 0 18px rgba(180, 30, 50, 0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.4));
   transition: transform 0.25s ease, filter 0.25s ease;

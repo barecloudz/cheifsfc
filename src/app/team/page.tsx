@@ -84,7 +84,7 @@ export default function TeamPage() {
               <span className="w-2 h-2 rounded-full bg-gold" />
               <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">The Squad</h2>
             </div>
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5 justify-items-center">
               {players.map((player) => (
                 <PlayerCard
                   key={player.id}
