@@ -1308,7 +1308,7 @@ export default function AdminDashboard() {
                       {/* Stats sliders */}
                       <div>
                         <label className={labelClass}>Stats</label>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                           {[
                             { label: "PAC", key: "pace" as const },
                             { label: "SHO", key: "shooting" as const },
@@ -1317,17 +1317,17 @@ export default function AdminDashboard() {
                             { label: "DEF", key: "defending" as const },
                             { label: "PHY", key: "physical" as const },
                           ].map((stat) => (
-                            <div key={stat.key} className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-muted w-7">{stat.label}</span>
+                            <div key={stat.key} className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] font-bold text-muted w-7 shrink-0">{stat.label}</span>
                               <input
                                 type="range"
                                 min="1"
                                 max="99"
                                 value={playerForm[stat.key]}
                                 onChange={(e) => setPlayerForm((f) => ({ ...f, [stat.key]: parseInt(e.target.value) }))}
-                                className="flex-1 accent-maroon h-1.5"
+                                className="flex-1 min-w-0 accent-maroon h-1.5"
                               />
-                              <span className="text-xs font-bold text-foreground w-6 text-right">{playerForm[stat.key]}</span>
+                              <span className="text-xs font-bold text-foreground w-6 text-right shrink-0">{playerForm[stat.key]}</span>
                             </div>
                           ))}
                         </div>
