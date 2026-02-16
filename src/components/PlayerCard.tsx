@@ -94,7 +94,7 @@ export default function PlayerCard({
         </div>
 
         {/* Bottom section: Name + Stats - inside frame */}
-        <div className="absolute top-[56%] left-[16%] right-[16%] bottom-[14%] flex flex-col items-center">
+        <div className="absolute top-[52%] left-[16%] right-[16%] bottom-[12%] flex flex-col items-center">
           {/* Divider */}
           <div className="w-3/5 h-[1px] bg-gradient-to-r from-transparent via-[#D4B04A]/50 to-transparent mb-[2%]" />
 
