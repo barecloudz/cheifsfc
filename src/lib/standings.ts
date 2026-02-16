@@ -19,6 +19,7 @@ export async function calculateStandings(): Promise<TeamStanding[]> {
     where: {
       homeScore: { not: null },
       awayScore: { not: null },
+      cancelled: false,
     },
   });
 
@@ -42,8 +43,10 @@ export async function calculateStandings(): Promise<TeamStanding[]> {
   for (const match of matches) {
     const homeScore = match.homeScore!;
     const awayScore = match.awayScore!;
-    const home = standings.get(match.homeTeamId)!;
-    const away = standings.get(match.awayTeamId)!;
+    const home = standings.get(match.homeTeamId);
+    const away = standings.get(match.awayTeamId);
+
+    if (!home || !away) continue;
 
     home.played++;
     away.played++;
