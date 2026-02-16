@@ -68,6 +68,7 @@ interface PlayerData {
 interface SiteSettingsData {
   teamPhotoUrl: string | null;
   playerCardsOn: boolean;
+  cardTypes: string;
 }
 
 type Tab = "dashboard" | "schedule" | "add" | "table" | "team";
@@ -119,7 +120,9 @@ export default function AdminDashboard() {
 
   // Team management state
   const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false });
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]" });
+  const [newCardTypeValue, setNewCardTypeValue] = useState("");
+  const [newCardTypeLabel, setNewCardTypeLabel] = useState("");
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -477,9 +480,43 @@ export default function AdminDashboard() {
   }
 
   const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
-  const cardTypes = [
-    { value: "default", label: "Default" },
-  ];
+  const customCardTypes: { value: string; label: string }[] = (() => {
+    try { return JSON.parse(siteSettings.cardTypes); } catch { return []; }
+  })();
+  const cardTypes = [{ value: "default", label: "Default" }, ...customCardTypes];
+
+  async function addCardType() {
+    const val = newCardTypeValue.trim().toLowerCase().replace(/\s+/g, "-");
+    const lbl = newCardTypeLabel.trim();
+    if (!val || !lbl) return;
+    if (cardTypes.some((ct) => ct.value === val)) {
+      showToast("Card type already exists");
+      return;
+    }
+    const updated = [...customCardTypes, { value: val, label: lbl }];
+    const json = JSON.stringify(updated);
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardTypes: json }),
+    });
+    setSiteSettings((s) => ({ ...s, cardTypes: json }));
+    setNewCardTypeValue("");
+    setNewCardTypeLabel("");
+    showToast("Card type added");
+  }
+
+  async function removeCardType(value: string) {
+    const updated = customCardTypes.filter((ct) => ct.value !== value);
+    const json = JSON.stringify(updated);
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardTypes: json }),
+    });
+    setSiteSettings((s) => ({ ...s, cardTypes: json }));
+    showToast("Card type removed");
+  }
 
   if (!authenticated) {
     return (
@@ -1214,6 +1251,67 @@ export default function AdminDashboard() {
                         siteSettings.playerCardsOn ? "left-6" : "left-1"
                       }`}
                     />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Types Management */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-background-secondary" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Card Types</h2>
+                </div>
+
+                <div className="space-y-1.5 mb-4">
+                  {cardTypes.map((ct) => (
+                    <div key={ct.value} className="flex items-center justify-between py-2 px-3 rounded-xl bg-background-secondary">
+                      <div>
+                        <span className="text-sm font-medium text-foreground">{ct.label}</span>
+                        <span className="text-[10px] text-muted ml-2">{ct.value}</span>
+                      </div>
+                      {ct.value !== "default" && (
+                        <button
+                          onClick={() => removeCardType(ct.value)}
+                          className="btn-touch text-[11px] text-red-500 font-medium px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100 transition-all"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Value (e.g. gold)"
+                    value={newCardTypeValue}
+                    onChange={(e) => setNewCardTypeValue(e.target.value)}
+                    className={selectClass + " flex-1"}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Label (e.g. Gold)"
+                    value={newCardTypeLabel}
+                    onChange={(e) => setNewCardTypeLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addCardType(); }}
+                    className={selectClass + " flex-1"}
+                  />
+                  <button
+                    onClick={addCardType}
+                    disabled={!newCardTypeValue.trim() || !newCardTypeLabel.trim()}
+                    className="btn-touch bg-maroon text-white text-sm font-semibold px-5 rounded-xl active:scale-95 disabled:opacity-40"
+                  >
+                    Add
                   </button>
                 </div>
               </div>
