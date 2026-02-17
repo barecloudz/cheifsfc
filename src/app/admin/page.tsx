@@ -15,6 +15,20 @@ interface Team {
   manualGA: number;
 }
 
+interface MatchEventData {
+  id: number;
+  type: string;
+  playerId: number | null;
+  player: { id: number; name: string } | null;
+  minute: number | null;
+}
+
+interface MatchAppearanceData {
+  id: number;
+  playerId: number;
+  player: { id: number; name: string };
+}
+
 interface MatchData {
   id: number;
   date: string;
@@ -27,6 +41,8 @@ interface MatchData {
   awayScore: number | null;
   cancelled: boolean;
   cancelReason: string | null;
+  events: MatchEventData[];
+  appearances: MatchAppearanceData[];
 }
 
 interface EditForm {
@@ -71,6 +87,26 @@ interface SiteSettingsData {
   cardTypes: string;
   pointsPerTraining: number;
   upgradeCost: number;
+  showGoalScorers: boolean;
+  showHighlights: boolean;
+  showPlayerStats: boolean;
+  showMotm: boolean;
+  showStreaks: boolean;
+  showLevels: boolean;
+  motmPoints: number;
+  streakBonus3: number;
+  streakBonus5: number;
+  streakBonus10: number;
+}
+
+interface HighlightData {
+  id: number;
+  title: string;
+  videoUrl: string;
+  thumbnail: string | null;
+  matchId: number | null;
+  pinned: boolean;
+  createdAt: string;
 }
 
 interface PointsPlayerData {
@@ -91,7 +127,7 @@ interface TrainingData {
   rsvps: { id: number; playerId: number; player: { id: number; name: string }; status: string; attended: boolean }[];
 }
 
-type Tab = "dashboard" | "schedule" | "add" | "table" | "team" | "points";
+type Tab = "dashboard" | "matches" | "table" | "team" | "points" | "content";
 
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
@@ -140,7 +176,7 @@ export default function AdminDashboard() {
 
   // Team management state
   const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]", pointsPerTraining: 10, upgradeCost: 10 });
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsData>({ teamPhotoUrl: null, playerCardsOn: false, cardTypes: "[]", pointsPerTraining: 10, upgradeCost: 10, showGoalScorers: true, showHighlights: true, showPlayerStats: true, showMotm: true, showStreaks: true, showLevels: true, motmPoints: 15, streakBonus3: 5, streakBonus5: 10, streakBonus10: 25 });
 
   // Points tab state
   const [pointsPlayers, setPointsPlayers] = useState<PointsPlayerData[]>([]);
@@ -158,12 +194,32 @@ export default function AdminDashboard() {
   const [expandedTraining, setExpandedTraining] = useState<number | null>(null);
   const [trainingAttendees, setTrainingAttendees] = useState<Record<number, number[]>>({});
   const [confirmingTraining, setConfirmingTraining] = useState<number | null>(null);
+  const [editingTraining, setEditingTraining] = useState<number | null>(null);
+  const [editTrainingForm, setEditTrainingForm] = useState({ date: "", time: "", location: "", notes: "" });
+  const [savingTraining, setSavingTraining] = useState(false);
   const [newCardTypeValue, setNewCardTypeValue] = useState("");
   const [newCardTypeLabel, setNewCardTypeLabel] = useState("");
   const [newCardTypeImageUrl, setNewCardTypeImageUrl] = useState("");
   const [newCardTypeUnlockCost, setNewCardTypeUnlockCost] = useState("");
   const [uploadingCardTypeImage, setUploadingCardTypeImage] = useState(false);
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
+
+  // Highlights state
+  const [highlights, setHighlights] = useState<HighlightData[]>([]);
+  const [highlightTitle, setHighlightTitle] = useState("");
+  const [highlightVideoUrl, setHighlightVideoUrl] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [addingHighlight, setAddingHighlight] = useState(false);
+
+  // Match events editing state
+  const [editingMatchEvents, setEditingMatchEvents] = useState<number | null>(null);
+  const [eventSquad, setEventSquad] = useState<number[]>([]);
+  const [eventGoals, setEventGoals] = useState<{ playerId: string; minute: string }[]>([]);
+  const [eventAssists, setEventAssists] = useState<{ playerId: string; minute: string }[]>([]);
+  const [eventCards, setEventCards] = useState<{ playerId: string; type: string; minute: string }[]>([]);
+  const [eventMotm, setEventMotm] = useState("");
+  const [savingEvents, setSavingEvents] = useState(false);
+
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
@@ -197,10 +253,10 @@ export default function AdminDashboard() {
     fetch("/api/players").then((r) => r.json()).then(setPlayers);
     fetch("/api/settings").then((r) => r.json()).then(setSiteSettings);
     fetch("/api/admin/points").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setPointsPlayers(data); });
+    fetch("/api/highlights").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setHighlights(data); });
     fetch("/api/training").then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) {
         setTrainings(data);
-        // Pre-populate attendee checkboxes with RSVP "in" players
         const attendees: Record<number, number[]> = {};
         data.forEach((t: TrainingData) => {
           if (!t.completed) {
@@ -552,7 +608,7 @@ export default function AdminDashboard() {
   }
 
   const positions = ["GK", "CB", "LB", "RB", "CM", "CDM", "CAM", "LW", "RW", "ST"];
-  const customCardTypes: { value: string; label: string; imageUrl?: string; unlockCost?: number }[] = (() => {
+  const customCardTypes: { value: string; label: string; imageUrl?: string; unlockCost?: number; unlockable?: boolean }[] = (() => {
     try { return JSON.parse(siteSettings.cardTypes); } catch { return []; }
   })();
   const cardTypes = [{ value: "default", label: "Default" }, ...customCardTypes];
@@ -584,7 +640,7 @@ export default function AdminDashboard() {
       return;
     }
     const unlockCost = parseInt(newCardTypeUnlockCost) || 0;
-    const updated = [...customCardTypes, { value: val, label: lbl, imageUrl: newCardTypeImageUrl, unlockCost }];
+    const updated = [...customCardTypes, { value: val, label: lbl, imageUrl: newCardTypeImageUrl, unlockCost, unlockable: true }];
     const json = JSON.stringify(updated);
     await fetch("/api/settings", {
       method: "PATCH",
@@ -599,6 +655,17 @@ export default function AdminDashboard() {
     showToast("Card type added");
   }
 
+  async function updateCardType(value: string, updates: Partial<{ unlockCost: number; unlockable: boolean }>) {
+    const updated = customCardTypes.map((ct) => ct.value === value ? { ...ct, ...updates } : ct);
+    const json = JSON.stringify(updated);
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardTypes: json }),
+    });
+    setSiteSettings((s) => ({ ...s, cardTypes: json }));
+  }
+
   async function removeCardType(value: string) {
     const updated = customCardTypes.filter((ct) => ct.value !== value);
     const json = JSON.stringify(updated);
@@ -609,6 +676,109 @@ export default function AdminDashboard() {
     });
     setSiteSettings((s) => ({ ...s, cardTypes: json }));
     showToast("Card type removed");
+  }
+
+  function startEditMatchEvents(m: MatchData) {
+    const squad = (m.appearances || []).map((a) => a.playerId);
+    const goals = (m.events || []).filter((e) => e.type === "goal").map((e) => ({ playerId: String(e.playerId || ""), minute: e.minute != null ? String(e.minute) : "" }));
+    const assists = (m.events || []).filter((e) => e.type === "assist").map((e) => ({ playerId: String(e.playerId || ""), minute: e.minute != null ? String(e.minute) : "" }));
+    const cards = (m.events || []).filter((e) => e.type === "yellow_card" || e.type === "red_card").map((e) => ({ playerId: String(e.playerId || ""), type: e.type, minute: e.minute != null ? String(e.minute) : "" }));
+    const motm = (m.events || []).find((e) => e.type === "motm");
+    setEventSquad(squad);
+    setEventGoals(goals.length ? goals : []);
+    setEventAssists(assists.length ? assists : []);
+    setEventCards(cards.length ? cards : []);
+    setEventMotm(motm ? String(motm.playerId || "") : "");
+    setEditingMatchEvents(m.id);
+  }
+
+  async function saveMatchEvents(matchId: number) {
+    setSavingEvents(true);
+    const events: { type: string; playerId: number; minute?: number }[] = [];
+    eventGoals.forEach((g) => { if (g.playerId) events.push({ type: "goal", playerId: parseInt(g.playerId), ...(g.minute ? { minute: parseInt(g.minute) } : {}) }); });
+    eventAssists.forEach((a) => { if (a.playerId) events.push({ type: "assist", playerId: parseInt(a.playerId), ...(a.minute ? { minute: parseInt(a.minute) } : {}) }); });
+    eventCards.forEach((c) => { if (c.playerId) events.push({ type: c.type, playerId: parseInt(c.playerId), ...(c.minute ? { minute: parseInt(c.minute) } : {}) }); });
+    if (eventMotm) events.push({ type: "motm", playerId: parseInt(eventMotm) });
+    await fetch("/api/matches", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: matchId, events, appearances: eventSquad }),
+    });
+    setSavingEvents(false);
+    setEditingMatchEvents(null);
+    showToast("Match details saved");
+    loadData();
+  }
+
+  async function uploadVideoToCloudinary(file: File): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "chiefs-unsigned");
+    const res = await fetch("https://api.cloudinary.com/v1_1/djqdjdwma/video/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.secure_url || null;
+  }
+
+  async function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVideo(true);
+    try {
+      const url = await uploadVideoToCloudinary(file);
+      if (url) setHighlightVideoUrl(url);
+      else showToast("Upload failed");
+    } catch { showToast("Upload failed"); }
+    setUploadingVideo(false);
+    e.target.value = "";
+  }
+
+  async function addHighlight() {
+    if (!highlightTitle.trim() || !highlightVideoUrl) return;
+    setAddingHighlight(true);
+    await fetch("/api/highlights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: highlightTitle.trim(), videoUrl: highlightVideoUrl }),
+    });
+    setHighlightTitle(""); setHighlightVideoUrl("");
+    setAddingHighlight(false);
+    showToast("Highlight added");
+    loadData();
+  }
+
+  async function deleteHighlight(id: number) {
+    if (!confirm("Delete this highlight?")) return;
+    await fetch("/api/highlights", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    showToast("Highlight deleted");
+    loadData();
+  }
+
+  async function toggleFeature(field: string, value: boolean) {
+    const update = { [field]: value };
+    setSiteSettings((s) => ({ ...s, ...update }));
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(update),
+    });
+    showToast(`${value ? "Enabled" : "Disabled"}`);
+  }
+
+  async function updatePointsConfig(field: string, value: number) {
+    setSiteSettings((s) => ({ ...s, [field]: value }));
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
   }
 
   if (!authenticated) {
@@ -627,11 +797,11 @@ export default function AdminDashboard() {
 
   const tabTitles: Record<Tab, string> = {
     dashboard: "Dashboard",
-    schedule: "Manage Matches",
-    add: "Add New Match",
+    matches: "Manage Matches",
     table: "Manage Table",
     team: "Manage Team",
     points: "Points Manager",
+    content: "Content & Settings",
   };
 
   const menuItems: { id: Tab; label: string; iconSvg: React.ReactNode }[] = [
@@ -648,25 +818,14 @@ export default function AdminDashboard() {
       ),
     },
     {
-      id: "schedule",
-      label: "Manage Matches",
+      id: "matches",
+      label: "Matches",
       iconSvg: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-      ),
-    },
-    {
-      id: "add",
-      label: "Add New Match",
-      iconSvg: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="16" />
-          <line x1="8" y1="12" x2="16" y2="12" />
         </svg>
       ),
     },
@@ -702,6 +861,16 @@ export default function AdminDashboard() {
       iconSvg: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      ),
+    },
+    {
+      id: "content",
+      label: "Content & Settings",
+      iconSvg: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       ),
     },
@@ -914,7 +1083,7 @@ export default function AdminDashboard() {
                       <span className="w-2 h-2 rounded-full bg-maroon" />
                       <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Recent Results</h3>
                     </div>
-                    <button onClick={() => setTab("schedule")} className="text-[10px] text-maroon font-semibold active:opacity-70">
+                    <button onClick={() => setTab("matches")} className="text-[10px] text-maroon font-semibold active:opacity-70">
                       View All
                     </button>
                   </div>
@@ -999,7 +1168,7 @@ export default function AdminDashboard() {
             {/* Quick actions */}
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setTab("add")}
+                onClick={() => setTab("matches")}
                 className="card-premium overflow-hidden text-left active:scale-[0.98] transition-transform"
               >
                 <div className="h-1 bg-maroon-gradient" />
@@ -1034,15 +1203,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ADD MATCH */}
-        {tab === "add" && (
-          <div className="card-premium overflow-hidden animate-fadeInUp">
-            <div className="h-1 bg-maroon-gradient" />
-            <div className="p-5">
-              <AdminMatchForm teams={teams} onSuccess={() => { showToast("Match added"); loadData(); setTab("schedule"); }} />
-            </div>
-          </div>
-        )}
+        {/* ADD MATCH - merged into matches tab below */}
 
         {/* MANAGE TABLE */}
         {tab === "table" && (
@@ -1269,262 +1430,6 @@ export default function AdminDashboard() {
         {/* MANAGE TEAM */}
         {tab === "team" && (
           <div className="space-y-4 animate-fadeInUp">
-            {/* Team Photo Section */}
-            <div className="card-premium overflow-hidden">
-              <div className="h-1 bg-maroon-gradient" />
-              <div className="p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                  </span>
-                  <h2 className="text-sm font-bold text-foreground">Team Photo</h2>
-                </div>
-
-                {siteSettings.teamPhotoUrl ? (
-                  <div className="space-y-3">
-                    <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-background-secondary">
-                      <Image
-                        src={siteSettings.teamPhotoUrl}
-                        alt="Team photo"
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 600px"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <label className="btn-touch flex-1 bg-background-secondary text-foreground text-sm font-semibold py-2.5 rounded-xl text-center cursor-pointer active:scale-[0.98]">
-                        {uploadingTeamPhoto ? "Uploading..." : "Replace Photo"}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
-                      </label>
-                      <button
-                        onClick={removeTeamPhoto}
-                        className="btn-touch px-4 bg-red-50 text-red-500 text-sm font-semibold rounded-xl active:scale-[0.98]"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <label className="block w-full border-2 border-dashed border-card-border rounded-xl p-8 text-center cursor-pointer hover:border-maroon/30 transition-colors">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      {uploadingTeamPhoto ? "Uploading..." : "Upload Team Photo"}
-                    </p>
-                    <p className="text-xs text-muted">Click to select an image</p>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            {/* Player Cards Toggle */}
-            <div className="card-premium overflow-hidden">
-              <div className="h-1 bg-gold/40" />
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                        <line x1="8" y1="21" x2="16" y2="21" />
-                        <line x1="12" y1="17" x2="12" y2="21" />
-                      </svg>
-                    </span>
-                    <div>
-                      <h2 className="text-sm font-bold text-foreground">Player Cards</h2>
-                      <p className="text-[11px] text-muted">Show FUT-style cards on /team page</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => togglePlayerCards(!siteSettings.playerCardsOn)}
-                    className={`relative w-12 h-7 rounded-full transition-colors ${
-                      siteSettings.playerCardsOn ? "bg-maroon" : "bg-background-secondary"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                        siteSettings.playerCardsOn ? "left-6" : "left-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Points Economy Settings */}
-            <div className="card-premium overflow-hidden">
-              <div className="h-1 bg-gold/40" />
-              <div className="p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2 className="text-sm font-bold text-foreground">Points Economy</h2>
-                    <p className="text-[11px] text-muted">Configure training rewards & upgrade costs</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelClass}>Points per Training</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={siteSettings.pointsPerTraining}
-                      onChange={async (e) => {
-                        const val = parseInt(e.target.value) || 1;
-                        setSiteSettings((s) => ({ ...s, pointsPerTraining: val }));
-                        await fetch("/api/settings", {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ pointsPerTraining: val }),
-                        });
-                      }}
-                      className={selectClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Upgrade Cost (per +1)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={siteSettings.upgradeCost}
-                      onChange={async (e) => {
-                        const val = parseInt(e.target.value) || 1;
-                        setSiteSettings((s) => ({ ...s, upgradeCost: val }));
-                        await fetch("/api/settings", {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ upgradeCost: val }),
-                        });
-                      }}
-                      className={selectClass}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card Types Management */}
-            <div className="card-premium overflow-hidden">
-              <div className="h-1 bg-background-secondary" />
-              <div className="p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                      <line x1="8" y1="21" x2="16" y2="21" />
-                      <line x1="12" y1="17" x2="12" y2="21" />
-                    </svg>
-                  </span>
-                  <h2 className="text-sm font-bold text-foreground">Card Types</h2>
-                </div>
-
-                <div className="space-y-1.5 mb-4">
-                  {cardTypes.map((ct) => (
-                    <div key={ct.value} className="flex items-center justify-between py-2 px-3 rounded-xl bg-background-secondary">
-                      <div className="flex items-center gap-2.5">
-                        {"imageUrl" in ct && ct.imageUrl ? (
-                          <div className="w-8 h-11 relative shrink-0">
-                            <Image src={ct.imageUrl} alt={ct.label} fill className="object-contain" sizes="32px" />
-                          </div>
-                        ) : (
-                          <div className="w-8 h-11 rounded bg-card-border/30 flex items-center justify-center shrink-0">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="2" y="3" width="20" height="14" rx="2" />
-                              <polyline points="21 15 16 10 5 21" />
-                            </svg>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{ct.label}</span>
-                          <span className="text-[10px] text-muted ml-2">{ct.value}</span>
-                          {"unlockCost" in ct && (ct as { unlockCost?: number }).unlockCost ? (
-                            <span className="text-[10px] text-gold-dark ml-2">{(ct as { unlockCost: number }).unlockCost} pts</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      {ct.value !== "default" && (
-                        <button
-                          onClick={() => removeCardType(ct.value)}
-                          className="btn-touch text-[11px] text-red-500 font-medium px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100 transition-all"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="bg-background rounded-xl p-3 space-y-2">
-                  <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Add New Card Type</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Value (e.g. gold)"
-                      value={newCardTypeValue}
-                      onChange={(e) => setNewCardTypeValue(e.target.value)}
-                      className={selectClass + " flex-1"}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Label (e.g. Gold)"
-                      value={newCardTypeLabel}
-                      onChange={(e) => setNewCardTypeLabel(e.target.value)}
-                      className={selectClass + " flex-1"}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Unlock cost"
-                      value={newCardTypeUnlockCost}
-                      onChange={(e) => setNewCardTypeUnlockCost(e.target.value)}
-                      className={selectClass + " w-24"}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {newCardTypeImageUrl ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <div className="w-8 h-11 relative shrink-0">
-                          <Image src={newCardTypeImageUrl} alt="Preview" fill className="object-contain" sizes="32px" />
-                        </div>
-                        <button
-                          onClick={() => setNewCardTypeImageUrl("")}
-                          className="text-[10px] text-red-500 font-medium"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="flex-1">
-                        <span className={selectClass + " block text-center cursor-pointer text-muted text-xs"}>
-                          {uploadingCardTypeImage ? "Uploading..." : "Upload Card Frame PNG"}
-                        </span>
-                        <input type="file" accept="image/png" className="hidden" onChange={handleCardTypeImageUpload} disabled={uploadingCardTypeImage} />
-                      </label>
-                    )}
-                    <button
-                      onClick={addCardType}
-                      disabled={!newCardTypeValue.trim() || !newCardTypeLabel.trim() || !newCardTypeImageUrl}
-                      className="btn-touch bg-maroon text-white text-sm font-semibold px-5 py-2.5 rounded-xl active:scale-95 disabled:opacity-40"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Player Management */}
             <div className="card-premium overflow-hidden">
               <div className="h-1 bg-background-secondary" />
@@ -1828,6 +1733,60 @@ export default function AdminDashboard() {
                           </button>
                           {isExpanded && (
                             <div className="px-3 pb-3 border-t border-card-border">
+                              {editingTraining === t.id ? (
+                                <div className="py-2 space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className={labelClass}>Date</label>
+                                      <input type="date" value={editTrainingForm.date} onChange={(e) => setEditTrainingForm((f) => ({ ...f, date: e.target.value }))} className={selectClass} />
+                                    </div>
+                                    <div>
+                                      <label className={labelClass}>Time</label>
+                                      <input type="time" value={editTrainingForm.time} onChange={(e) => setEditTrainingForm((f) => ({ ...f, time: e.target.value }))} className={selectClass} />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className={labelClass}>Location</label>
+                                    <input type="text" value={editTrainingForm.location} onChange={(e) => setEditTrainingForm((f) => ({ ...f, location: e.target.value }))} className={selectClass} />
+                                  </div>
+                                  <div>
+                                    <label className={labelClass}>Notes</label>
+                                    <input type="text" value={editTrainingForm.notes} onChange={(e) => setEditTrainingForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={selectClass} />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={async () => {
+                                        setSavingTraining(true);
+                                        await fetch("/api/training", {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            id: t.id,
+                                            date: new Date(`${editTrainingForm.date}T${editTrainingForm.time}:00`).toISOString(),
+                                            location: editTrainingForm.location.trim(),
+                                            notes: editTrainingForm.notes.trim() || null,
+                                          }),
+                                        });
+                                        setSavingTraining(false);
+                                        setEditingTraining(null);
+                                        showToast("Training updated");
+                                        loadData();
+                                      }}
+                                      disabled={savingTraining || !editTrainingForm.date || !editTrainingForm.time || !editTrainingForm.location.trim()}
+                                      className="btn-touch flex-1 bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-40"
+                                    >
+                                      {savingTraining ? "Saving..." : "Save Changes"}
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingTraining(null)}
+                                      className="btn-touch px-4 bg-background-secondary text-muted text-sm font-medium py-2.5 rounded-xl active:scale-[0.98]"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
                               {t.notes && <p className="text-[11px] text-muted italic py-2">{t.notes}</p>}
                               <p className="text-[10px] text-muted uppercase tracking-wider font-medium mt-2 mb-1.5">Mark Attendance</p>
                               <div className="space-y-1 mb-3">
@@ -1876,6 +1835,21 @@ export default function AdminDashboard() {
                                   {confirmingTraining === t.id ? "Confirming..." : `Confirm Attendance (${(trainingAttendees[t.id] || []).length})`}
                                 </button>
                                 <button
+                                  onClick={() => {
+                                    const d = new Date(t.date);
+                                    const dateStr = d.toISOString().split("T")[0];
+                                    const timeStr = d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" });
+                                    setEditTrainingForm({ date: dateStr, time: timeStr, location: t.location, notes: t.notes || "" });
+                                    setEditingTraining(t.id);
+                                  }}
+                                  className="btn-touch w-11 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center active:bg-blue-100"
+                                >
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                                <button
                                   onClick={async () => {
                                     if (!confirm("Delete this training session?")) return;
                                     await fetch("/api/training", {
@@ -1894,6 +1868,8 @@ export default function AdminDashboard() {
                                   </svg>
                                 </button>
                               </div>
+                              </>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2045,8 +2021,24 @@ export default function AdminDashboard() {
         )}
 
         {/* MANAGE MATCHES */}
-        {tab === "schedule" && (
+        {tab === "matches" && (
           <div className="animate-fadeInUp">
+            {/* Add Match Form */}
+            <div className="card-premium overflow-hidden mb-6">
+              <div className="h-1 bg-maroon-gradient" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Add New Match</h2>
+                </div>
+                <AdminMatchForm teams={teams} onSuccess={() => { showToast("Match added"); loadData(); }} />
+              </div>
+            </div>
+
             {/* Upcoming */}
             {upcoming.length > 0 && (
               <div className="mb-6">
@@ -2223,7 +2215,11 @@ export default function AdminDashboard() {
                   <span className="text-[10px] text-muted font-medium ml-auto">{completed.length} match{completed.length !== 1 ? "es" : ""}</span>
                 </div>
                 <div className="space-y-3">
-                  {completed.map((m) => (
+                  {completed.map((m) => {
+                    const isEditingEvents = editingMatchEvents === m.id;
+                    const eventCount = (m.events || []).length;
+                    const squadCount = (m.appearances || []).length;
+                    return (
                     <div key={m.id} className="card-premium overflow-hidden">
                       <div className="h-1 bg-maroon/20" />
                       <div className="p-4">
@@ -2238,18 +2234,144 @@ export default function AdminDashboard() {
                           <span className="text-lg font-bold text-maroon px-3">{m.homeScore} - {m.awayScore}</span>
                           <span className="text-sm font-semibold text-right">{m.awayTeam.name}</span>
                         </div>
+
+                        {/* Event summary badges */}
+                        {(eventCount > 0 || squadCount > 0) && !isEditingEvents && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {squadCount > 0 && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{squadCount} players</span>}
+                            {(m.events || []).filter((e) => e.type === "goal").length > 0 && <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{(m.events || []).filter((e) => e.type === "goal").length} goals</span>}
+                            {(m.events || []).filter((e) => e.type === "motm").length > 0 && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">MOTM</span>}
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-card-border">
                           <p className="text-[11px] text-muted">{m.venue}</p>
-                          <button
-                            onClick={() => deleteMatch(m.id)}
-                            className="text-[11px] text-red-500 font-medium active:opacity-70 hover:text-red-700 transition-colors"
-                          >
-                            Delete
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => isEditingEvents ? setEditingMatchEvents(null) : startEditMatchEvents(m)}
+                              className="text-[11px] text-maroon font-semibold active:opacity-70"
+                            >
+                              {isEditingEvents ? "Close" : "Match Details"}
+                            </button>
+                            <button
+                              onClick={() => deleteMatch(m.id)}
+                              className="text-[11px] text-red-500 font-medium active:opacity-70 hover:text-red-700 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Match Events Editing UI */}
+                        {isEditingEvents && (
+                          <div className="mt-3 pt-3 border-t border-card-border space-y-4">
+                            {/* Squad */}
+                            <div>
+                              <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1.5">Squad ({eventSquad.length} selected)</p>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {players.map((p) => (
+                                  <label key={p.id} className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-background transition-colors cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={eventSquad.includes(p.id)}
+                                      onChange={(e) => setEventSquad((prev) => e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id))}
+                                      className="w-4 h-4 rounded accent-maroon"
+                                    />
+                                    <span className="text-sm text-foreground">{p.name}</span>
+                                    <span className="text-[10px] text-muted ml-auto">{p.position}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Goals */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Goals</p>
+                                <button onClick={() => setEventGoals((prev) => [...prev, { playerId: "", minute: "" }])} className="text-[10px] text-maroon font-semibold">+ Add</button>
+                              </div>
+                              {eventGoals.map((g, i) => (
+                                <div key={i} className="flex items-center gap-2 mb-1.5">
+                                  <select value={g.playerId} onChange={(e) => setEventGoals((prev) => prev.map((x, j) => j === i ? { ...x, playerId: e.target.value } : x))} className={selectClass + " flex-1"}>
+                                    <option value="">Player...</option>
+                                    {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                  <input type="number" min="1" max="120" placeholder="Min" value={g.minute} onChange={(e) => setEventGoals((prev) => prev.map((x, j) => j === i ? { ...x, minute: e.target.value } : x))} className={selectClass + " w-16"} />
+                                  <button onClick={() => setEventGoals((prev) => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Assists */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Assists</p>
+                                <button onClick={() => setEventAssists((prev) => [...prev, { playerId: "", minute: "" }])} className="text-[10px] text-maroon font-semibold">+ Add</button>
+                              </div>
+                              {eventAssists.map((a, i) => (
+                                <div key={i} className="flex items-center gap-2 mb-1.5">
+                                  <select value={a.playerId} onChange={(e) => setEventAssists((prev) => prev.map((x, j) => j === i ? { ...x, playerId: e.target.value } : x))} className={selectClass + " flex-1"}>
+                                    <option value="">Player...</option>
+                                    {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                  <input type="number" min="1" max="120" placeholder="Min" value={a.minute} onChange={(e) => setEventAssists((prev) => prev.map((x, j) => j === i ? { ...x, minute: e.target.value } : x))} className={selectClass + " w-16"} />
+                                  <button onClick={() => setEventAssists((prev) => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Cards */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Cards</p>
+                                <button onClick={() => setEventCards((prev) => [...prev, { playerId: "", type: "yellow_card", minute: "" }])} className="text-[10px] text-maroon font-semibold">+ Add</button>
+                              </div>
+                              {eventCards.map((c, i) => (
+                                <div key={i} className="flex items-center gap-2 mb-1.5">
+                                  <select value={c.playerId} onChange={(e) => setEventCards((prev) => prev.map((x, j) => j === i ? { ...x, playerId: e.target.value } : x))} className={selectClass + " flex-1"}>
+                                    <option value="">Player...</option>
+                                    {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                  <select value={c.type} onChange={(e) => setEventCards((prev) => prev.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} className={selectClass + " w-20"}>
+                                    <option value="yellow_card">Yellow</option>
+                                    <option value="red_card">Red</option>
+                                  </select>
+                                  <input type="number" min="1" max="120" placeholder="Min" value={c.minute} onChange={(e) => setEventCards((prev) => prev.map((x, j) => j === i ? { ...x, minute: e.target.value } : x))} className={selectClass + " w-16"} />
+                                  <button onClick={() => setEventCards((prev) => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* MOTM */}
+                            {siteSettings.showMotm && (
+                              <div>
+                                <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1.5">Man of the Match</p>
+                                <select value={eventMotm} onChange={(e) => setEventMotm(e.target.value)} className={selectClass}>
+                                  <option value="">None</option>
+                                  {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => saveMatchEvents(m.id)}
+                              disabled={savingEvents}
+                              className="btn-touch w-full bg-maroon-gradient text-white text-sm font-semibold py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-50 shadow-sm shadow-maroon/15"
+                            >
+                              {savingEvents ? "Saving..." : "Save Match Details"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2267,13 +2389,298 @@ export default function AdminDashboard() {
                 <p className="text-foreground font-semibold text-sm mb-1">No matches yet</p>
                 <p className="text-muted text-xs mb-5">Add your first match to get started</p>
                 <button
-                  onClick={() => setTab("add")}
+                  onClick={() => setTab("matches")}
                   className="btn-touch bg-maroon-gradient text-white text-sm font-semibold px-6 py-2.5 rounded-full active:scale-95 shadow-sm shadow-maroon/15"
                 >
                   Add First Match
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* CONTENT & SETTINGS */}
+        {tab === "content" && (
+          <div className="space-y-4 animate-fadeInUp">
+            {/* Feature Toggles */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-maroon-gradient" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Feature Toggles</h2>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { key: "showGoalScorers", label: "Goal Scorers", desc: "Show goal scorers on match cards and match pages" },
+                    { key: "showHighlights", label: "Highlights", desc: "Show video highlights on homepage" },
+                    { key: "showPlayerStats", label: "Player Stats Page", desc: "Public stats table (appearances, goals, etc)" },
+                    { key: "showMotm", label: "Man of the Match", desc: "MOTM selection + bonus points" },
+                    { key: "showStreaks", label: "Training Streaks", desc: "Streak counter + bonus points" },
+                    { key: "showLevels", label: "XP Levels", desc: "Level badges on player cards" },
+                    { key: "playerCardsOn", label: "Player Cards", desc: "FIFA-style player cards on /team page" },
+                  ].map((toggle) => (
+                    <div key={toggle.key} className="flex items-center justify-between py-2 px-1">
+                      <div className="flex-1 mr-3">
+                        <p className="text-sm font-semibold text-foreground">{toggle.label}</p>
+                        <p className="text-[11px] text-muted">{toggle.desc}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleFeature(toggle.key, !(siteSettings as unknown as Record<string, boolean>)[toggle.key])}
+                        className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${
+                          (siteSettings as unknown as Record<string, boolean>)[toggle.key] ? "bg-maroon" : "bg-background-secondary"
+                        }`}
+                      >
+                        <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                          (siteSettings as unknown as Record<string, boolean>)[toggle.key] ? "left-6" : "left-1"
+                        }`} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Points Config */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-gold/40" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Points Config</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: "pointsPerTraining", label: "Points per Training" },
+                    { key: "upgradeCost", label: "Upgrade Cost (per +1)" },
+                    { key: "motmPoints", label: "MOTM Bonus Points" },
+                    { key: "streakBonus3", label: "3-Streak Bonus" },
+                    { key: "streakBonus5", label: "5-Streak Bonus" },
+                    { key: "streakBonus10", label: "10-Streak Bonus" },
+                  ].map((cfg) => (
+                    <div key={cfg.key}>
+                      <label className={labelClass}>{cfg.label}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={(siteSettings as unknown as Record<string, number>)[cfg.key] || 0}
+                        onChange={(e) => updatePointsConfig(cfg.key, parseInt(e.target.value) || 1)}
+                        className={selectClass}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Highlights Manager */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-maroon-gradient" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-maroon/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Highlights</h2>
+                </div>
+
+                {/* Upload form */}
+                <div className="bg-background rounded-xl p-3 space-y-2 mb-4">
+                  <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Add Highlight</p>
+                  <input
+                    type="text"
+                    placeholder="Title (e.g. Goal vs Rangers)"
+                    value={highlightTitle}
+                    onChange={(e) => setHighlightTitle(e.target.value)}
+                    className={selectClass}
+                  />
+                  <div className="flex items-center gap-2">
+                    {highlightVideoUrl ? (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-[11px] text-emerald-600 font-medium truncate flex-1">Video uploaded</span>
+                        <button onClick={() => setHighlightVideoUrl("")} className="text-[10px] text-red-500 font-medium shrink-0">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="flex-1">
+                        <span className={selectClass + " block text-center cursor-pointer text-muted text-xs"}>
+                          {uploadingVideo ? "Uploading video..." : "Upload Video"}
+                        </span>
+                        <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} disabled={uploadingVideo} />
+                      </label>
+                    )}
+                    <button
+                      onClick={addHighlight}
+                      disabled={addingHighlight || !highlightTitle.trim() || !highlightVideoUrl}
+                      className="btn-touch bg-maroon text-white text-sm font-semibold px-5 py-2.5 rounded-xl active:scale-95 disabled:opacity-40"
+                    >
+                      {addingHighlight ? "..." : "Add"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Highlights list */}
+                <div className="space-y-1.5">
+                  {highlights.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between py-2 px-3 rounded-xl bg-background-secondary">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{h.title}</p>
+                        <p className="text-[10px] text-muted">
+                          {new Date(h.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })}
+                          {h.pinned && " · Pinned"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteHighlight(h.id)}
+                        className="btn-touch text-[11px] text-red-500 font-medium px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100 transition-all shrink-0 ml-2"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                  {highlights.length === 0 && (
+                    <p className="text-center text-muted text-sm py-4">No highlights yet</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Team Photo */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-background-secondary" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Team Photo</h2>
+                </div>
+                {siteSettings.teamPhotoUrl ? (
+                  <div className="space-y-3">
+                    <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-background-secondary">
+                      <Image src={siteSettings.teamPhotoUrl} alt="Team photo" fill className="object-cover" sizes="(max-width: 768px) 100vw, 600px" />
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="btn-touch flex-1 bg-background-secondary text-foreground text-sm font-semibold py-2.5 rounded-xl text-center cursor-pointer active:scale-[0.98]">
+                        {uploadingTeamPhoto ? "Uploading..." : "Replace Photo"}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
+                      </label>
+                      <button onClick={removeTeamPhoto} className="btn-touch px-4 bg-red-50 text-red-500 text-sm font-semibold rounded-xl active:scale-[0.98]">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block w-full border-2 border-dashed border-card-border rounded-xl p-8 text-center cursor-pointer hover:border-maroon/30 transition-colors">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <p className="text-sm font-medium text-foreground mb-1">{uploadingTeamPhoto ? "Uploading..." : "Upload Team Photo"}</p>
+                    <p className="text-xs text-muted">Click to select an image</p>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleTeamPhotoUpload} disabled={uploadingTeamPhoto} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Card Types */}
+            <div className="card-premium overflow-hidden">
+              <div className="h-1 bg-background-secondary" />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-background-secondary flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                  </span>
+                  <h2 className="text-sm font-bold text-foreground">Card Types</h2>
+                </div>
+                <div className="space-y-1.5 mb-4">
+                  {cardTypes.map((ct) => {
+                    const isCustom = ct.value !== "default";
+                    const unlockCost = "unlockCost" in ct ? (ct as { unlockCost?: number }).unlockCost || 0 : 0;
+                    const unlockable = "unlockable" in ct ? (ct as { unlockable?: boolean }).unlockable !== false : true;
+                    return (
+                    <div key={ct.value} className="py-2 px-3 rounded-xl bg-background-secondary">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          {"imageUrl" in ct && ct.imageUrl ? (
+                            <div className="w-8 h-11 relative shrink-0"><Image src={ct.imageUrl} alt={ct.label} fill className="object-contain" sizes="32px" /></div>
+                          ) : (
+                            <div className="w-8 h-11 rounded bg-card-border/30 flex items-center justify-center shrink-0">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.5"><rect x="2" y="3" width="20" height="14" rx="2" /><polyline points="21 15 16 10 5 21" /></svg>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-sm font-medium text-foreground">{ct.label}</span>
+                            <span className="text-[10px] text-muted ml-2">{ct.value}</span>
+                          </div>
+                        </div>
+                        {isCustom && (
+                          <button onClick={() => removeCardType(ct.value)} className="btn-touch text-[11px] text-red-500 font-medium px-2 py-1 rounded-lg hover:bg-red-50 active:bg-red-100 transition-all">Remove</button>
+                        )}
+                      </div>
+                      {isCustom && (
+                        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-card-border/50">
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-[10px] text-muted font-medium">Cost</label>
+                            <input type="number" min="0" value={unlockCost} onChange={(e) => updateCardType(ct.value, { unlockCost: parseInt(e.target.value) || 0 })} className="w-16 bg-white border border-card-border rounded-lg px-2 py-1 text-xs text-foreground text-center focus:outline-none focus:border-maroon" />
+                            <span className="text-[10px] text-muted">pts</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <label className="text-[10px] text-muted font-medium">Unlockable</label>
+                            <button onClick={() => updateCardType(ct.value, { unlockable: !unlockable })} className={`relative w-9 h-5 rounded-full transition-colors ${unlockable ? "bg-emerald-500" : "bg-gray-300"}`}>
+                              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${unlockable ? "translate-x-4" : ""}`} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
+                </div>
+                <div className="bg-background rounded-xl p-3 space-y-2">
+                  <p className="text-[10px] text-muted uppercase tracking-wider font-medium">Add New Card Type</p>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Value (e.g. gold)" value={newCardTypeValue} onChange={(e) => setNewCardTypeValue(e.target.value)} className={selectClass + " flex-1"} />
+                    <input type="text" placeholder="Label (e.g. Gold)" value={newCardTypeLabel} onChange={(e) => setNewCardTypeLabel(e.target.value)} className={selectClass + " flex-1"} />
+                    <input type="number" min="0" placeholder="Unlock cost" value={newCardTypeUnlockCost} onChange={(e) => setNewCardTypeUnlockCost(e.target.value)} className={selectClass + " w-24"} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {newCardTypeImageUrl ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="w-8 h-11 relative shrink-0"><Image src={newCardTypeImageUrl} alt="Preview" fill className="object-contain" sizes="32px" /></div>
+                        <button onClick={() => setNewCardTypeImageUrl("")} className="text-[10px] text-red-500 font-medium">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="flex-1">
+                        <span className={selectClass + " block text-center cursor-pointer text-muted text-xs"}>{uploadingCardTypeImage ? "Uploading..." : "Upload Card Frame PNG"}</span>
+                        <input type="file" accept="image/png" className="hidden" onChange={handleCardTypeImageUpload} disabled={uploadingCardTypeImage} />
+                      </label>
+                    )}
+                    <button onClick={addCardType} disabled={!newCardTypeValue.trim() || !newCardTypeLabel.trim() || !newCardTypeImageUrl} className="btn-touch bg-maroon text-white text-sm font-semibold px-5 py-2.5 rounded-xl active:scale-95 disabled:opacity-40">Add</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

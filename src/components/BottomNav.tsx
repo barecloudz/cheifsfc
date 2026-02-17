@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const tabs = [
   {
@@ -66,6 +67,16 @@ const tabs = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [showStats, setShowStats] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.showPlayerStats !== undefined) setShowStats(data.showPlayerStats);
+      })
+      .catch(() => {});
+  }, []);
 
   if (pathname.startsWith("/admin") || pathname === "/player/login") return null;
 
@@ -76,7 +87,15 @@ export default function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-card-border md:hidden shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-around h-16 px-4 max-w-lg mx-auto">
-        {tabs.map((tab) => {
+        {[...tabs, ...(showStats ? [{
+          href: "/stats",
+          label: "Stats",
+          icon: (active: boolean) => (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "var(--maroon)" : "var(--gray)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
+            </svg>
+          ),
+        }] : [])].map((tab) => {
           const isActive = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
           return (
             <Link

@@ -50,6 +50,13 @@ interface TrainingSession {
   rsvpSummary: { inCount: number; outCount: number };
 }
 
+interface DashboardSettings {
+  showMotm: boolean;
+  showStreaks: boolean;
+  showLevels: boolean;
+  pointsPerTraining: number;
+}
+
 export default function PlayerDashboard() {
   const router = useRouter();
   const [player, setPlayer] = useState<PlayerData | null>(null);
@@ -63,6 +70,15 @@ export default function PlayerDashboard() {
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState<number | null>(null);
   const [pointsAnim, setPointsAnim] = useState<{ amount: number; key: number } | null>(null);
+  const [motmCount, setMotmCount] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [level, setLevel] = useState("Rookie");
+  const [dashSettings, setDashSettings] = useState<DashboardSettings>({
+    showMotm: true,
+    showStreaks: true,
+    showLevels: true,
+    pointsPerTraining: 10,
+  });
 
   const loadDashboard = useCallback(async () => {
     const res = await fetch("/api/player/dashboard");
@@ -75,6 +91,10 @@ export default function PlayerDashboard() {
     setTransactions(data.transactions);
     setUpgradeCost(data.upgradeCost);
     setCardTypes(data.cardTypes);
+    setMotmCount(data.motmCount || 0);
+    setStreak(data.streak || 0);
+    setLevel(data.level || "Rookie");
+    if (data.settings) setDashSettings(data.settings);
     setLoading(false);
   }, [router]);
 
@@ -243,17 +263,52 @@ export default function PlayerDashboard() {
               physical={player.physical}
               cardType={player.cardType}
               cardImageUrl={cardImageUrl}
+              level={level}
+              showLevel={dashSettings.showLevels}
             />
           </div>
         </div>
 
-        {/* OVR Badge */}
-        <div className="flex justify-center mb-5">
+        {/* OVR Badge + Level */}
+        <div className="flex justify-center gap-2 mb-5">
           <div className={`bg-gradient-to-r ${ratingColors[ratingTier]} text-white px-5 py-1.5 rounded-full shadow-lg`}>
             <span className="text-lg font-black">{overall}</span>
             <span className="text-[10px] font-bold uppercase tracking-wider ml-1.5 opacity-80">OVR</span>
           </div>
         </div>
+
+        {/* Gamification badges row */}
+        {(dashSettings.showStreaks || dashSettings.showMotm || dashSettings.showLevels) && (
+          <div className="flex gap-2 mb-4 justify-center flex-wrap">
+            {dashSettings.showStreaks && streak > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-lg">&#128293;</span>
+                <div>
+                  <p className="text-sm font-bold text-orange-600">{streak}</p>
+                  <p className="text-[9px] text-orange-500 uppercase font-medium">Streak</p>
+                </div>
+              </div>
+            )}
+            {dashSettings.showMotm && motmCount > 0 && (
+              <div className="bg-gold/10 border border-gold/20 rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-lg">&#11088;</span>
+                <div>
+                  <p className="text-sm font-bold text-gold-dark">{motmCount}</p>
+                  <p className="text-[9px] text-gold-dark uppercase font-medium">MOTM</p>
+                </div>
+              </div>
+            )}
+            {dashSettings.showLevels && (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-lg">&#127942;</span>
+                <div>
+                  <p className="text-sm font-bold text-purple-600">{level}</p>
+                  <p className="text-[9px] text-purple-500 uppercase font-medium">Level</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Points Balance */}
         <div className="card-premium overflow-hidden mb-4 relative">
@@ -452,8 +507,8 @@ export default function PlayerDashboard() {
                         </button>
                       </div>
                       <div className="flex items-center gap-3 mt-2 pt-2 border-t border-card-border">
-                        <span className="text-[10px] text-emerald-600 font-medium">{t.rsvpSummary.inCount} in</span>
-                        <span className="text-[10px] text-red-500 font-medium">{t.rsvpSummary.outCount} out</span>
+                        <span className="text-[10px] text-emerald-600 font-medium">{t.rsvpSummary?.inCount ?? 0} in</span>
+                        <span className="text-[10px] text-red-500 font-medium">{t.rsvpSummary?.outCount ?? 0} out</span>
                       </div>
                     </div>
                   );
@@ -480,7 +535,7 @@ export default function PlayerDashboard() {
                     </div>
                     {t.myAttended ? (
                       <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        Attended +{upgradeCost} pts
+                        Attended +{dashSettings.pointsPerTraining} pts
                       </span>
                     ) : (
                       <span className="text-[10px] font-bold text-muted bg-background-secondary px-2 py-0.5 rounded-full">
@@ -514,6 +569,10 @@ export default function PlayerDashboard() {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="2" y="3" width="20" height="14" rx="2" />
                     </svg>
+                  ) : tx.type === "motm" ? (
+                    <span className="text-[10px]">&#11088;</span>
+                  ) : tx.type === "streak_bonus" ? (
+                    <span className="text-[10px]">&#128293;</span>
                   ) : (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dark)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />

@@ -3,22 +3,37 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-
-const links = [
-  { href: "/", label: "Home" },
-  { href: "/schedule", label: "Schedule" },
-  { href: "/table", label: "Table" },
-  { href: "/team", label: "Team" },
-];
+import { useEffect, useState } from "react";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [showStats, setShowStats] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.showPlayerStats !== undefined) {
+          setShowStats(data.showPlayerStats);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Hide on admin/login/player pages — those have their own headers
   if (pathname.startsWith("/admin")) return null;
   if (pathname.startsWith("/player")) return null;
   // Hide on subpages that use PageHeader
   if (pathname.startsWith("/matches/")) return null;
+  if (pathname.startsWith("/stats")) return null;
+
+  const links = [
+    { href: "/", label: "Home" },
+    { href: "/schedule", label: "Schedule" },
+    { href: "/table", label: "Table" },
+    { href: "/team", label: "Team" },
+    ...(showStats ? [{ href: "/stats", label: "Stats" }] : []),
+  ];
 
   return (
     <nav className="app-header">

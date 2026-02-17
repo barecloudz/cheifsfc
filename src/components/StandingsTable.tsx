@@ -19,8 +19,8 @@ export default function StandingsTable({ standings, limit }: StandingsTableProps
             <th className="text-center py-2.5 px-1">W</th>
             <th className="text-center py-2.5 px-1">D</th>
             <th className="text-center py-2.5 px-1">L</th>
-            <th className="text-center py-2.5 px-1 hidden sm:table-cell">GF</th>
-            <th className="text-center py-2.5 px-1 hidden sm:table-cell">GA</th>
+            <th className="text-center py-2.5 px-1">GF</th>
+            <th className="text-center py-2.5 px-1">GA</th>
             <th className="text-center py-2.5 px-1">GD</th>
             <th className="text-center py-2.5 px-2 text-maroon font-semibold">Pts</th>
           </tr>
@@ -47,8 +47,8 @@ export default function StandingsTable({ standings, limit }: StandingsTableProps
                 <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.won}</td>
                 <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.drawn}</td>
                 <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.lost}</td>
-                <td className="text-center py-2.5 px-1 text-foreground-secondary hidden sm:table-cell">{team.goalsFor}</td>
-                <td className="text-center py-2.5 px-1 text-foreground-secondary hidden sm:table-cell">{team.goalsAgainst}</td>
+                <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.goalsFor}</td>
+                <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.goalsAgainst}</td>
                 <td className="text-center py-2.5 px-1 text-foreground-secondary">{team.goalDifference}</td>
                 <td className={`text-center py-2.5 px-2 font-bold ${isChiefs ? "text-maroon" : "text-foreground"}`}>
                   {team.points}

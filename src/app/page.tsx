@@ -5,33 +5,46 @@ import { calculateStandings } from "@/lib/standings";
 import MatchCard from "@/components/MatchCard";
 import StandingsTable from "@/components/StandingsTable";
 import CountdownTimer from "@/components/CountdownTimer";
+import HighlightsSection from "@/components/HighlightsSection";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const now = new Date();
 
-  const nextMatch = await prisma.match.findFirst({
-    where: {
-      date: { gte: now },
-      homeScore: null,
-      cancelled: false,
-    },
-    orderBy: { date: "asc" },
-    include: { homeTeam: true, awayTeam: true },
-  });
+  const [nextMatch, recentMatches, standings, settings, highlights] = await Promise.all([
+    prisma.match.findFirst({
+      where: {
+        date: { gte: now },
+        homeScore: null,
+        cancelled: false,
+      },
+      orderBy: { date: "asc" },
+      include: { homeTeam: true, awayTeam: true },
+    }),
+    prisma.match.findMany({
+      where: {
+        homeScore: { not: null },
+        awayScore: { not: null },
+      },
+      orderBy: { date: "desc" },
+      take: 3,
+      include: {
+        homeTeam: true,
+        awayTeam: true,
+        events: { include: { player: true } },
+      },
+    }),
+    calculateStandings(),
+    prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    prisma.highlight.findMany({
+      orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+      take: 10,
+    }),
+  ]);
 
-  const recentMatches = await prisma.match.findMany({
-    where: {
-      homeScore: { not: null },
-      awayScore: { not: null },
-    },
-    orderBy: { date: "desc" },
-    take: 3,
-    include: { homeTeam: true, awayTeam: true },
-  });
-
-  const standings = await calculateStandings();
+  const showGoalScorers = settings?.showGoalScorers ?? true;
+  const showHighlights = settings?.showHighlights ?? true;
 
   return (
     <div>
@@ -136,19 +149,45 @@ export default async function Home() {
         <section className="mb-6">
           <SectionHeader title="Recent Results" href="/schedule" />
           <div className="space-y-3">
-            {recentMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                id={m.id}
-                date={m.date.toISOString()}
-                venue={m.venue}
-                homeTeam={m.homeTeam.name}
-                awayTeam={m.awayTeam.name}
-                homeScore={m.homeScore}
-                awayScore={m.awayScore}
-              />
-            ))}
+            {recentMatches.map((m) => {
+              // Aggregate goal scorers for this match
+              const goalEvents = m.events.filter((e) => e.type === "goal" && e.player);
+              const scorerMap = new Map<string, number>();
+              goalEvents.forEach((g) => {
+                const name = g.player!.name;
+                scorerMap.set(name, (scorerMap.get(name) || 0) + 1);
+              });
+              const goalScorers = Array.from(scorerMap.entries()).map(([name, count]) => ({ name, count }));
+
+              return (
+                <MatchCard
+                  key={m.id}
+                  id={m.id}
+                  date={m.date.toISOString()}
+                  venue={m.venue}
+                  homeTeam={m.homeTeam.name}
+                  awayTeam={m.awayTeam.name}
+                  homeScore={m.homeScore}
+                  awayScore={m.awayScore}
+                  goalScorers={goalScorers}
+                  showGoalScorers={showGoalScorers}
+                />
+              );
+            })}
           </div>
+        </section>
+      )}
+
+      {/* Highlights */}
+      {showHighlights && highlights.length > 0 && (
+        <section className="mb-6">
+          <SectionHeader title="Highlights" />
+          <HighlightsSection highlights={highlights.map((h) => ({
+            id: h.id,
+            title: h.title,
+            videoUrl: h.videoUrl,
+            thumbnail: h.thumbnail,
+          }))} />
         </section>
       )}
 

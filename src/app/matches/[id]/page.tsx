@@ -14,14 +14,48 @@ export default async function MatchDetailPage({
   const matchId = parseInt(id);
   if (isNaN(matchId)) notFound();
 
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    include: { homeTeam: true, awayTeam: true },
-  });
+  const [match, settings] = await Promise.all([
+    prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        homeTeam: true,
+        awayTeam: true,
+        events: { include: { player: true } },
+        appearances: { include: { player: true } },
+      },
+    }),
+    prisma.siteSettings.findUnique({ where: { id: 1 } }),
+  ]);
 
   if (!match) notFound();
 
   const played = match.homeScore !== null && match.awayScore !== null;
+  const showGoalScorers = settings?.showGoalScorers ?? true;
+  const showMotm = settings?.showMotm ?? true;
+
+  // Group goal events by team side
+  const goals = match.events.filter((e) => e.type === "goal");
+  const assists = match.events.filter((e) => e.type === "assist");
+  const motmEvent = match.events.find((e) => e.type === "motm");
+
+  // Determine if a goal scorer is on the home or away side
+  // We use appearances to figure out which players played for Chiefs (home or away)
+  const isChiefsHome = match.homeTeam.name === "Chiefs FC";
+
+  // Group goals for display
+  const goalsByPlayer = new Map<number, { name: string; minutes: number[] }>();
+  goals.forEach((g) => {
+    if (!g.playerId || !g.player) return;
+    const existing = goalsByPlayer.get(g.playerId);
+    if (existing) {
+      if (g.minute) existing.minutes.push(g.minute);
+    } else {
+      goalsByPlayer.set(g.playerId, {
+        name: g.player.name,
+        minutes: g.minute ? [g.minute] : [],
+      });
+    }
+  });
 
   return (
     <>
@@ -74,6 +108,56 @@ export default async function MatchDetailPage({
                 <p className="text-[10px] text-muted uppercase tracking-wider mt-1">Away</p>
               </div>
             </div>
+
+            {/* Goal scorers */}
+            {played && showGoalScorers && goalsByPlayer.size > 0 && (
+              <div className="bg-background rounded-2xl p-4 mb-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <span className="text-base">&#9917;</span>
+                  <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Goal Scorers</span>
+                </div>
+                <div className="space-y-1.5">
+                  {Array.from(goalsByPlayer.entries()).map(([playerId, { name, minutes }]) => (
+                    <div key={playerId} className="flex items-center justify-center gap-2">
+                      <span className="text-sm font-semibold text-foreground">{name}</span>
+                      {minutes.length > 0 && (
+                        <span className="text-xs text-muted">
+                          {minutes.sort((a, b) => a - b).map((m) => `${m}'`).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assists */}
+            {played && showGoalScorers && assists.length > 0 && (
+              <div className="bg-background rounded-2xl p-4 mb-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <span className="text-[11px] font-medium text-muted uppercase tracking-wider">Assists</span>
+                </div>
+                <div className="space-y-1.5">
+                  {assists.map((a) => (
+                    <div key={a.id} className="flex items-center justify-center gap-2">
+                      <span className="text-sm font-medium text-foreground-secondary">{a.player?.name || "Unknown"}</span>
+                      {a.minute && <span className="text-xs text-muted">{a.minute}&apos;</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Man of the Match */}
+            {played && showMotm && motmEvent?.player && (
+              <div className="bg-gold/10 rounded-2xl p-4 mb-4 text-center border border-gold/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-base">&#11088;</span>
+                  <span className="text-[11px] font-bold text-gold-dark uppercase tracking-wider">Man of the Match</span>
+                </div>
+                <p className="text-lg font-bold text-gold-dark">{motmEvent.player.name}</p>
+              </div>
+            )}
 
             {/* Date */}
             <div className="text-center mb-4">

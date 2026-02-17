@@ -69,6 +69,30 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(training, { status: 201 });
 }
 
+export async function PATCH(request: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id, date, location, notes } = await request.json();
+
+  if (!id) {
+    return NextResponse.json({ error: "Training ID required" }, { status: 400 });
+  }
+
+  const data: Record<string, unknown> = {};
+  if (date !== undefined) data.date = new Date(date);
+  if (location !== undefined) data.location = location;
+  if (notes !== undefined) data.notes = notes || null;
+
+  const training = await prisma.training.update({
+    where: { id },
+    data,
+  });
+
+  return NextResponse.json(training);
+}
+
 export async function DELETE(request: NextRequest) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

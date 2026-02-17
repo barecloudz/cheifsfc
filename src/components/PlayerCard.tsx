@@ -15,7 +15,17 @@ interface PlayerCardProps {
   physical: number;
   cardType?: string;
   cardImageUrl?: string;
+  level?: string;
+  showLevel?: boolean;
 }
+
+const levelColors: Record<string, string> = {
+  Rookie: "bg-gray-500",
+  Starter: "bg-emerald-500",
+  Regular: "bg-blue-500",
+  Veteran: "bg-purple-500",
+  Legend: "bg-gradient-to-r from-yellow-500 to-amber-500",
+};
 
 export default function PlayerCard({
   name,
@@ -29,6 +39,8 @@ export default function PlayerCard({
   physical,
   cardType = "default",
   cardImageUrl,
+  level,
+  showLevel = false,
 }: PlayerCardProps) {
   const rating = Math.round((pace + shooting + passing + dribbling + defending + physical) / 6);
   const cardImage = cardImageUrl || (cardType === "default" ? "/futcard.png" : `/futcard-${cardType}.png`);
@@ -45,7 +57,16 @@ export default function PlayerCard({
   ];
 
   return (
-    <div className="fut-card">
+    <div className="fut-card relative">
+      {/* Level badge */}
+      {showLevel && level && (
+        <div className="absolute -top-2 -right-2 z-20">
+          <span className={`${levelColors[level] || "bg-gray-500"} text-white text-[8px] font-bold px-2 py-0.5 rounded-full shadow-lg uppercase tracking-wider`}>
+            {level}
+          </span>
+        </div>
+      )}
+
       {/* Card frame PNG */}
       <Image
         src={cardImage}

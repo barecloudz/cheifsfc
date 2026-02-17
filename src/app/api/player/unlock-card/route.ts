@@ -26,13 +26,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
   }
 
-  const cardTypes: { value: string; label: string; unlockCost?: number }[] = (() => {
+  const cardTypes: { value: string; label: string; unlockCost?: number; unlockable?: boolean }[] = (() => {
     try { return JSON.parse(settings?.cardTypes || "[]"); } catch { return []; }
   })();
 
   const targetType = cardTypes.find((ct) => ct.value === cardType);
   if (!targetType) {
     return NextResponse.json({ error: "Card type not found" }, { status: 404 });
+  }
+
+  if (targetType.unlockable === false) {
+    return NextResponse.json({ error: "This card type is not available for unlock" }, { status: 403 });
   }
 
   const unlockCost = targetType.unlockCost || 0;

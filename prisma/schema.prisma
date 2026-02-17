@@ -25,19 +25,54 @@ model Team {
 }
 
 model Match {
-  id           Int       @id @default(autoincrement())
+  id           Int               @id @default(autoincrement())
   date         DateTime
   venue        String
   homeTeamId   Int
   awayTeamId   Int
   homeScore    Int?
   awayScore    Int?
-  cancelled    Boolean   @default(false)
+  cancelled    Boolean           @default(false)
   cancelReason String?
-  homeTeam     Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam     Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  homeTeam     Team              @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team              @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  events       MatchEvent[]
+  appearances  MatchAppearance[]
+  highlights   Highlight[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model MatchEvent {
+  id       Int     @id @default(autoincrement())
+  matchId  Int
+  match    Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId Int?
+  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  type     String  // goal, assist, yellow_card, red_card, motm
+  minute   Int?
+  notes    String?
+}
+
+model MatchAppearance {
+  id       Int    @id @default(autoincrement())
+  matchId  Int
+  match    Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId Int
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+}
+
+model Highlight {
+  id        Int      @id @default(autoincrement())
+  title     String
+  videoUrl  String
+  thumbnail String?
+  matchId   Int?
+  match     Match?   @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model Player {
@@ -61,6 +96,8 @@ model Player {
   createdAt         DateTime           @default(now())
   rsvps             TrainingRsvp[]
   pointTransactions PointTransaction[]
+  matchEvents       MatchEvent[]
+  appearances       MatchAppearance[]
 }
 
 model PointTransaction {
@@ -103,4 +140,14 @@ model SiteSettings {
   cardTypes         String   @default("[]")
   pointsPerTraining Int      @default(10)
   upgradeCost       Int      @default(10)
+  showGoalScorers   Boolean  @default(true)
+  showHighlights    Boolean  @default(true)
+  showPlayerStats   Boolean  @default(true)
+  showMotm          Boolean  @default(true)
+  showStreaks        Boolean  @default(true)
+  showLevels        Boolean  @default(true)
+  motmPoints        Int      @default(15)
+  streakBonus3      Int      @default(5)
+  streakBonus5      Int      @default(10)
+  streakBonus10     Int      @default(25)
 }

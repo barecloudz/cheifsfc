@@ -3,6 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 
+interface GoalScorer {
+  name: string;
+  count: number;
+}
+
 interface MatchCardProps {
   id: number;
   date: string;
@@ -13,6 +18,8 @@ interface MatchCardProps {
   awayScore: number | null;
   cancelled?: boolean;
   cancelReason?: string | null;
+  goalScorers?: GoalScorer[];
+  showGoalScorers?: boolean;
 }
 
 export default function MatchCard({
@@ -25,6 +32,8 @@ export default function MatchCard({
   awayScore,
   cancelled,
   cancelReason,
+  goalScorers,
+  showGoalScorers = true,
 }: MatchCardProps) {
   const matchDate = new Date(date);
   const played = homeScore !== null && awayScore !== null;
@@ -101,6 +110,20 @@ export default function MatchCard({
             <TeamBadge name={awayTeam} side="away" />
           </div>
         </div>
+
+        {/* Goal scorers */}
+        {played && showGoalScorers && goalScorers && goalScorers.length > 0 && (
+          <div className="mb-3 text-center">
+            <p className="text-[11px] text-muted">
+              {goalScorers.map((g, i) => (
+                <span key={i}>
+                  {i > 0 && ", "}
+                  {g.name}{g.count > 1 ? ` (${g.count})` : ""}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
       </Link>
 
       {/* Venue & directions */}
